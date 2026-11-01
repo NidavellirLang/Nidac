@@ -1,37 +1,5 @@
 # Nidavellir Programming Language
-<badge-placeholder></badge-placeholder>
 
-> **This repository has been archived and development has moved.**
-
-Nidavellir is an open-source compiled programming language and compiler project, originally created and developed by [@Ic3zy](https://github.com/Ic3zy).
-
-The project has moved to the **NidavellirLang** GitHub organization to establish a dedicated home for the language and its ecosystem.
-
-### Official repository
-
-**[NidavellirLang/nidac](https://github.com/NidavellirLang/nidac)**
-
-All future development, releases, issues and contributions will take place in the new repository.
-
-### Project history
-
-This repository is preserved as part of Nidavellir's development history. Its original commit history and attribution remain intact.
-
----
-
-*Created by [@Ic3zy](https://github.com/Ic3zy).*  
-*Maintained under the NidavellirLang organization.*
-
-
-
-
-**Nidavellir** is a statically-typed programming language designed to provide low-overhead syntax while maintaining native execution and explicit compiler control.
-
-The compiler driver for Nidavellir is **`nidac`**.
-
----
-<details>
-    <summary>Project Readme</summary>
 ## Identity & Core Philosophy
 
 - **Language vs. Driver**: **Nidavellir** is the programming language (source files use the `.nida` extension). **`nidac`** is the compiler driver.
