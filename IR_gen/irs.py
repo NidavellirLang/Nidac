@@ -164,7 +164,7 @@ class NumberIR(IR):
 
 
 class ClassIR(IR):
-    def __init__(self, name, body, fields=None):
+    def __init__(self, name, id, body, fields=None):
         self.name = name
         self.body = body
 

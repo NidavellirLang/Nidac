@@ -809,7 +809,7 @@ class IRLowerer:
         if isinstance(type_val, Type):
             return str(type_val)
 
-        raise Exception(f"Invalid type: {type_val}")
+        raise Exception(f"Invalid type: {type_val}, {type(type_val)}")
 
     def str_of(self, hir):
         type = self.type_of(hir)

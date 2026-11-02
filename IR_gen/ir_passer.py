@@ -205,7 +205,7 @@ class IRPasser:
                 break
 
         class_type = ClassType(ir.name)
-        fn_name = self.f_alloc.anon()
+        fn_name = self.id_alloc.anon()
 
         assigned = self._assigned_fields(init)
 

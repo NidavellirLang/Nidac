@@ -356,13 +356,27 @@ class IRGen:
 
         return new_body
 
+    def _class_fields(self, ast):
+        lk = self.get_lk(ast)
+        fields = []
+        raw_fields = lk.fields
+        for key, val in raw_fields.items():
+            name = val.target
+            type = val.type
+            default_value = val.value
+            fields.append((name, type, default_value))
+
+        # raise Exception(fields)
+        return fields
+
     def gen_ClassAST(self, ast):
+        id = ast.node_id
         name = ast.name
         body = ast.body
 
         new_body = self.process_class_body(body)
 
-        return ClassIR(name, new_body, self._class_fields(ast))
+        return ClassIR(name, id, new_body, self._class_fields(ast))
 
     def _gen_unary_op(self, target, ast):
         op = ast.op

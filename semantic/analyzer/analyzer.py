@@ -508,19 +508,17 @@ class SymbolTreeBuilder:
 
     def stmt_ClassAST(self, ast):
         name = ast.name
+        id = self.get_id(ast)
 
-        class_sym = self.stm.lookup(name)
+        class_sym = self.stm.lookup_class_name(name)
 
         if class_sym is None:
             class_sym = ClassSymbol(name, ast)
-            self.stm.add_symbol(class_sym)
+            self.stm.define_class(name, id, class_sym)
 
         class_sym.ast_node = ast
-        self.class_syms[name] = class_sym
 
         self.stm.enter_scope()
-
-        self.current_class_name = name
 
         for b in ast.body:
             res = self.process_stmt(b)
@@ -583,11 +581,24 @@ class SymbolTreeBuilder:
     def process_from_list(self, asts):
         st = []
         for ast in asts:
+            self.type_analysis(ast)
             res = self.process_stmt(ast)
             if res is not None:
                 st.append(res)
 
         return st
+
+    def type_analysis(self, ast):
+        if hasattr(ast, "type"):
+            ast.type = resolve_type(ast.type)
+
+        if hasattr(ast, "body"):
+            for b in ast.body:
+                self.type_analysis(b)
+
+        if hasattr(ast, "args"):
+            for a in ast.args:
+                self.type_analysis(a)
 
     def run(self):
         # self.declare(self.ast_tree)
