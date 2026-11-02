@@ -170,6 +170,8 @@ class FunctionSymbol(Symbol):
         self.uses = []
         self.returned = []
 
+        self.is_called = False
+
     def set_type_to_AST(self):
         self.ast_node.type = self.type
 

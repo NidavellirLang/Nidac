@@ -1,6 +1,7 @@
 from .irs import *
 from .ir_destinations import *
 from type_systems.types import *
+from utils.errors import *
 
 
 class IR_Box:
@@ -25,6 +26,10 @@ class IRPasser:
         final_irs = []
         main_stmts = []
         pre_main_stmts = []
+        if not self.irs:
+            raise NidavellirSyntaxError(
+                "No executable code found. The file is empty or contains no reachable functions."
+            )
 
         for ir in self.irs:
             for result in self.run_stmt(ir):

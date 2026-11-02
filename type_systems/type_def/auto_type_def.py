@@ -196,6 +196,7 @@ class AutoTypeDefEngine:
 
     def _process_FunctionSymbol(self, sym):
         arg_types = {}
+        sym.is_called = True
 
         for call in sym.uses:
             if not isinstance(call, (CallSymbol, ConstructorCallSymbol)):

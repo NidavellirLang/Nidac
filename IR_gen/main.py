@@ -176,6 +176,10 @@ class IRGen:
         name = lk.name
         type = lk.type
 
+        is_called = lk.is_called
+        if not is_called:
+            return None
+
         decs = ast.decorators
         args = ast.args
         body = ast.body
@@ -382,7 +386,8 @@ class IRGen:
     def gen_from_list(self, asts):
         for ast in asts:
             res = self.gen(ast)
-            self.IRs.append(res)
+            if res is not None:
+                self.IRs.append(res)
 
         # raise Exception(self.IRs)
 
