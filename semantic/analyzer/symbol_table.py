@@ -45,6 +45,8 @@ class SymbolRegistry:
         existing = self.symbols_by_id.get(symbol_id)
 
         if existing is not None:
+            if symbol is None:
+                raise Exception()
             if existing.ast_node is symbol.ast_node:
                 self.symbols_by_id[symbol_id] = symbol
                 return symbol

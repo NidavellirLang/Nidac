@@ -206,7 +206,12 @@ class SymbolTreeBuilder:
             if res is not None:
                 params.append(res)
 
-            if lookup_func_arg is not None and res is not None and not is_intrinsic:
+            if (
+                lookup_func_arg is not None
+                and res is not None
+                and not is_intrinsic
+                and not isinstance(lookup_func_arg, SelfSymbol)
+            ):
                 lookup_func_arg.uses.append(res)
 
         return params
@@ -242,6 +247,9 @@ class SymbolTreeBuilder:
             return self.process_intrinsic_call(ast)
 
         skip = False
+
+        if lookup is None:
+            lookup = self.stm.lookup_class_name(func_name)
 
         if lookup is None:
             skip = True
@@ -519,6 +527,7 @@ class SymbolTreeBuilder:
         class_sym.ast_node = ast
 
         self.stm.enter_scope()
+        self.current_class_name = name
 
         for b in ast.body:
             res = self.process_stmt(b)
@@ -531,6 +540,17 @@ class SymbolTreeBuilder:
                 else:
                     class_sym.fields[b.target] = b
             elif isinstance(b, FunctionAST):
+                fn_res = self.process_stmt(b)
+                if b.name == "__init__":
+                    class_sym.init_fn = fn_res
+                    params = []
+                    for p in b.args:
+                        p_res = self.process_stmt(p)
+                        if not isinstance(p, SelfAST):
+                            params.append(p_res)
+
+                    class_sym.params = params
+
                 class_sym.methods[b.name] = b
                 class_sym.method_syms[b.name] = res
 
@@ -539,7 +559,6 @@ class SymbolTreeBuilder:
                         class_sym.fields.setdefault(stmt.chain[0], stmt)
 
         self.current_class_name = None
-
         self.stm.exit_scope()
 
         return class_sym
@@ -553,6 +572,9 @@ class SymbolTreeBuilder:
         return FieldAccessSymbol(target_sym, chain, ast)
 
     def eval_SelfAST(self, ast):
+        if self.current_class_name is None:
+            raise NidavellirSemanticError("Cannot use self outside of class", ast.line)
+
         return SelfSymbol(ast, self.current_class_name)
 
     def process_eval(self, ast):

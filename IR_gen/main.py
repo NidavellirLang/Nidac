@@ -92,7 +92,9 @@ class IRGen:
         )
 
     def gen_SelfAST(self, ast):
-        return VariableIR("self", ast.type)
+        lk = self.get_lk(ast)
+        type = ClassType(lk.class_name)
+        return VariableIR("self", type)
 
     def gen_ReturnAST(self, ast):
         value = ast.value

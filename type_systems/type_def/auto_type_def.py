@@ -279,14 +279,19 @@ class AutoTypeDefEngine:
 
         return calls
 
+    # returned is_class and lk
     def _get_function_from_target(self, target):
         if isinstance(target, FunctionSymbol):
-            return target
+            return False, target
+        elif isinstance(target, ClassSymbol):
+            return True, target
 
         if isinstance(target, VariableSymbol):
             lookup = target.lookup
             if isinstance(lookup, FunctionSymbol):
-                return lookup
+                return False, lookup
+            elif isinstance(lookup, ClassSymbol):
+                return True, lookup
             else:
                 return self._get_function_from_target(lookup)
 
@@ -329,24 +334,47 @@ class AutoTypeDefEngine:
         if isinstance(lk, FunctionSymbol):
             self._process_FunctionSymbol(lk)
         else:
-            fn = self._get_function_from_target(lk)
-            self._check_args_counts(sym, fn)
+            is_class, fn = self._get_function_from_target(lk)
+            if not is_class:
+                self._check_args_counts(sym, fn)
 
-            calls = self._get_calls_from_value(lk)
-            for call in calls:
-                arg_uses = []
-                for arg in call.args:
-                    arg_uses.append(arg)
+                calls = self._get_calls_from_value(lk)
+                for call in calls:
+                    arg_uses = []
+                    for arg in call.args:
+                        arg_uses.append(arg)
 
-                self._set_arg_uses(fn, arg_uses)
+                    self._set_arg_uses(fn, arg_uses)
 
-            self._set_arg_uses(fn, sym.args)
+                self._set_arg_uses(fn, sym.args)
 
-            fn.uses.extend(calls)
-            self._process_FunctionSymbol(fn)
+                fn.uses.extend(calls)
+                self._process_FunctionSymbol(fn)
 
-            if sym.type is None:
-                sym.type = fn.type
+                if sym.type is None:
+                    sym.type = fn.type
+            else:
+                req_params = fn.params
+                init_fn = fn.init_fn
+                if init_fn is None and sym.args:
+                    raise NidavellirTypeError(
+                        f"Cannot call constructor of class '{fn.name}' with arguments",
+                        sym.ast_node.line,
+                    )
+                if req_params is None and sym.args:
+                    raise NidavellirTypeError(
+                        f"Constructor of class '{fn.name}' requires no arguments",
+                        sym.ast_node.line,
+                    )
+
+                elif req_params is not None and len(req_params) != len(sym.args):
+                    raise NidavellirTypeError(
+                        f"Constructor of class '{fn.name}' requires "
+                        f"{len(req_params)} arguments, but {len(sym.args)} were provided",
+                        sym.ast_node.line,
+                    )
+
+                sym.type = ClassType(fn.name)
 
         if sym.type is None:
             if sym.lookup.type is None:

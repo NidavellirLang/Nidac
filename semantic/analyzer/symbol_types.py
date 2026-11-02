@@ -320,6 +320,9 @@ class ClassSymbol(Symbol):
 
         self.body = []
 
+        self.init_fn = None
+        self.params = None
+
         self.fields = {}
         self.methods = {}
 
