@@ -67,19 +67,14 @@ class AssignIR(IR):
         value,
         type=None,
         re_assign=False,
-        chain=None,
-        base_type=None,
-        chain_types=None,
+        field=None,
     ):
         self.target = target
         self.value = value
         self.type = type
 
         self.re_assign = re_assign
-
-        self.chain = chain or []
-        self.base_type = base_type
-        self.chain_types = chain_types or []
+        self.field = field
 
 
 class FieldAccessIR(IR):

@@ -212,32 +212,16 @@ class IRPasser:
         class_type = ClassType(ir.name)
         fn_name = self.id_alloc.anon()
 
-        assigned = self._assigned_fields(init)
-
-        field_setters = []
-
-        for field_name, field_type, default_value in ir.fields:
-            if field_name in assigned:
-                continue
-
-            setter = self._field_setter(
-                class_type, field_name, field_type, default_value
-            )
-
-            if setter is None:
-                continue
-
-            for box in self.run_stmt(setter):
-                field_setters.extend(box.ir)
+        # TODO: add field setters support
+        # field_setters = []
 
         body = [
             AssignIR(
                 "self",
                 NewIR(ir.name, class_type),
                 class_type,
-                chain=[],
             ),
-            *field_setters,
+            # *field_setters,
         ]
 
         if init is not None:
@@ -256,18 +240,6 @@ class IRPasser:
             is_main_func=False,
             is_static=False,
         )
-
-    def _assigned_fields(self, init):
-        if init is None:
-            return set()
-
-        names = set()
-
-        for stmt in init.body:
-            if isinstance(stmt, AssignIR) and stmt.chain:
-                names.add(stmt.chain[0])
-
-        return names
 
     def _field_setter(self, class_type, field_name, field_type, default_value):
         if default_value is None:

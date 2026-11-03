@@ -41,7 +41,21 @@ class SymbolTreeBuilder:
         return resolved
 
     def eval_VariableAST(self, ast):
+        name = ast.name
+        if name == "self":
+            if self.current_class_name is None:
+                raise NidavellirSemanticError(
+                    "self is only allowed inside class", ast.line
+                )
+
+            class_type = ClassType(self.current_class_name)
+            classes = self.stm.lookup_class_name(self.current_class_name)
+            vs = VariableSymbol(name, classes, ast)
+            vs.type = class_type
+            return vs
+
         var = self.stm.lookup_assignment_name(ast.name)
+
         if var is None:
             var = self.stm.lookup_func_name(ast.name)
 
@@ -99,6 +113,9 @@ class SymbolTreeBuilder:
 
         return ListLiteralSymbol(elements, ast)
 
+    def stmt_SelfAST(self, ast):
+        return self.eval_SelfAST(ast)
+
     def stmt_PassAST(self, ast):
         pass
 
@@ -132,8 +149,11 @@ class SymbolTreeBuilder:
         elif target != "self":
             self.stm.define_assignment(target, ast.node_id, final_sym)
 
-        if ast.chain:
-            raise NidavellirNotImplementedError("Chained assignments")
+        field = ast.field
+        field_sym = self.process_eval(field) if field is not None else None
+
+        if field_sym is not None:
+            final_sym.field = field_sym
 
         return final_sym
 
@@ -535,8 +555,8 @@ class SymbolTreeBuilder:
                 class_sym.body.append(res)
 
             if isinstance(b, AssignAST):
-                if b.chain:
-                    class_sym.fields[b.chain[0]] = b
+                if b.field:
+                    raise NidavellirNotImplementedError("Not implemented", b.line)
                 else:
                     class_sym.fields[b.target] = b
 
@@ -556,9 +576,9 @@ class SymbolTreeBuilder:
                 class_sym.methods[b.name] = b
                 class_sym.method_syms[b.name] = res
 
-                for stmt in b.body:
-                    if isinstance(stmt, AssignAST) and stmt.chain:
-                        class_sym.fields.setdefault(stmt.chain[0], stmt)
+                # for stmt in b.body:
+                #     if isinstance(stmt, AssignAST) and stmt.chain:
+                #         class_sym.fields.setdefault(stmt.chain[0], stmt)
 
         self.current_class_name = None
         self.stm.exit_scope()

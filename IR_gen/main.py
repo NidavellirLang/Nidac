@@ -44,7 +44,8 @@ class IRGen:
 
         is_re_assign = lk.is_re_assign
 
-        chain = getattr(ast, "chain", []) or []
+        field = ast.field
+        field_ir = self.gen(field) if field is not None else None
 
         # if isinstance(value, UnaryOpAST):
         #     val_res = self._gen_unary_op(target, value)
@@ -61,9 +62,7 @@ class IRGen:
             val_res,
             var_type,
             re_assign=is_re_assign,
-            chain=chain,
-            base_type=self._type_of(getattr(ast, "base_type", None)),
-            chain_types=[self._type_of(t) for t in getattr(ast, "chain_types", [])],
+            field=field_ir,
         )
 
     def _type_of(self, type_val):
@@ -91,11 +90,14 @@ class IRGen:
         idn_lk = self.get_lk(ast.field)
         idn_name = self._get_name_from_IdentifierAST(field)
 
-        return FieldAccessIR(
+        field_ir = FieldAccessIR(
             target_ir,
             idn_name,
             self._type_of(lk.type),
         )
+
+        # raise Exception(idn_lk)
+        return field_ir
 
     def gen_SelfAST(self, ast):
         lk = self.get_lk(ast)
@@ -164,6 +166,9 @@ class IRGen:
         lk = self.get_lk(ast)
         name = lk.name
         type = lk.type
+        if type is None:
+            raise NidavellirInternalError(f"No type for VariableAST")
+
         return VariableIR(name, type)
 
     def gen_BinaryOpAST(self, ast):

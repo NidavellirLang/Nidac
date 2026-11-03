@@ -111,13 +111,9 @@ class AutoTypeDefEngine:
                     "Cannot determine type of assigned value", sym.ast_node.line
                 )
 
-        if sym.chain:
-            base = sym.base_sym
+        if sym.field:
 
-            if base.type is None:
-                self.process(base)
-
-            self._resolve_chain(base.type, sym.chain, sym)
+            self.process(sym.field)
 
     def process_DefinitionSymbol(self, sym):
         if sym.type is None:
@@ -430,15 +426,14 @@ class AutoTypeDefEngine:
 
             field_sym = class_sym.field_syms.get(field.name)
             # raise Exception(class_sym)
-            field_name = field_sym.name
             if field_sym is None:
                 raise NidavellirTypeError(
-                    f"Field '{sym.field_name}' not found in class '{target.type.name}'",
+                    f"Field '{sym.ast_node.field.name}' not found in class '{target.type.name}'",
                     sym.ast_node.line,
                 )
 
             field.lookup = field_sym
-            field.field_name = field_name
+            field.field_name = field_sym.name
             if field_sym.type is None:
                 self.process(field_sym)
 
@@ -451,6 +446,7 @@ class AutoTypeDefEngine:
             with TypeUpdate(field):
                 field.type = field_sym.type
                 sym.type = field_sym.type
+
         return
 
     def _find_class(self, name):

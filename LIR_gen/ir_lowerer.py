@@ -149,7 +149,10 @@ class IRLowerer:
 
     def process_VariableIR(self, hir):
         name = hir.name
-        type_str = self.str_of(hir)
+        try:
+            type_str = self.str_of(hir)
+        except:
+            raise Exception(hir)
 
         const_id = self.get_value_id()
         lirs = LIRs()
@@ -201,57 +204,60 @@ class IRLowerer:
         value = hir.value
         type_str = self.str_of(hir)
         is_reassign = hir.re_assign
-        chain = hir.chain or []
+        field = hir.field
 
-        is_no_value = False
-        if isinstance(value, NoneIR) and value.air:
-            is_no_value = True
+        is_no_value = isinstance(value, NoneIR) and value.air
+
+        value_lirs = None
+        value_id = None
 
         if not is_no_value:
             value_lirs = self.process(value)
             value_id = self.get_current_value_id()
 
-        as_lir = None
-
-        if chain:
+        if field is not None:
             if is_no_value:
                 raise Exception("Cannot assign to member without value")
-            # "obj.member = value": store into the member of the object.
-            base = self._load_base(target, hir.base_type)
 
-            chain_types = hir.chain_types or []
+            if not isinstance(field, FieldAccessIR):
+                raise TypeError(f"Expected FieldAccessIR, got {type(field).__name__}")
 
-            for idx, member in enumerate(chain[:-1]):
-                member_type = (
-                    self.type_str_of(chain_types[idx], type_str)
-                    if idx < len(chain_types)
-                    else type_str
-                )
+            # Evaluate the object that owns the field.
+            self.process(field.target)
+            base_id = self.get_current_value_id()
 
-                access = FieldAccessLIR(self.get_value_id(), base, member, member_type)
-                self.blocks.emit(access)
-                base = access.name
-
-            member_type = (
-                self.type_str_of(chain_types[-1], type_str) if chain_types else type_str
+            member_type = self.type_str_of(
+                self.type_of(field),
+                type_str,
             )
 
             store_lir = FieldStoreLIR(
-                self.get_value_id(), base, chain[-1], member_type, value_id
+                self.get_value_id(),
+                base_id,
+                field.field,
+                member_type,
+                value_id,
             )
+
             self.blocks.emit(store_lir)
             as_lir = store_lir
+
         elif is_reassign:
-            const_id = self.get_current_value_id()
-            store_lir = StoreLIR(target, type_str, const_id)
+            store_lir = StoreLIR(
+                target,
+                type_str,
+                value_id,
+            )
+
             self.blocks.emit(store_lir)
             as_lir = store_lir
+
         else:
-            if not is_no_value:
-                const_id = self.get_current_value_id()
-                declare_lir = DeclareLIR(target, type_str, const_id)
-            else:
+            if is_no_value:
                 declare_lir = DeclareOnlyLIR(target, type_str)
+            else:
+                declare_lir = DeclareLIR(target, type_str, value_id)
+
             self.blocks.emit(declare_lir)
             as_lir = declare_lir
 

@@ -98,7 +98,7 @@ class AssignSymbol(Symbol):
 
         self.uses = []
 
-        self.chain = []
+        self.field = None
         self.base_sym = None
 
         self.is_re_assign = re_assign

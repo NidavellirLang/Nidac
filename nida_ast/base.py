@@ -133,9 +133,9 @@ class ReturnAST(AST):
 @dataclass(slots=True, repr=False)
 class AssignAST(AST):
     target: str
-    chain: list
-    value: AST
-    type: str
+    field: AST | None
+    value: AST | None
+    type: str | None
 
 
 @dataclass(slots=True, repr=False)

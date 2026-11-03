@@ -515,22 +515,59 @@ class Parser:
 
     def parse_chain_target(self):
         start_token = self.consume("NAME")
-        chain = []
+        target_name = start_token[1]
 
-        while self.peek_kind() == "DOT":
-            self.advance()
+        target = VariableAST(
+            name=target_name,
+            line=self._make_line(start_token),
+            node_id=self.id_alloc.alloc(),
+        )
 
-            if self.peek_kind() == "NAME":
-                field_token = self.advance()
-                chain.append(field_token[1])
+        has_access = False
+
+        while True:
+            kind = self.peek_kind()
+
+            if kind == "DOT":
+                self.advance()
+                member_token = self.consume("NAME")
+
+                field = IdentifierAST(
+                    name=member_token[1],
+                    line=self._make_line(member_token),
+                    node_id=self.id_alloc.alloc(),
+                )
+
+                target = FieldAccessAST(
+                    target=target,
+                    field=field,
+                    line=self._span_line(target.line, field.line, member_token),
+                    node_id=self.id_alloc.alloc(),
+                )
+
+                has_access = True
+
+            elif kind == "LBRACKET":
+                self.advance()
+                index_expr = self.parse_expression()
+                end_token = self.current
+                self.consume("RBRACKET")
+
+                target = IndexAccessAST(
+                    target=target,
+                    index=index_expr,
+                    line=self._span_line(
+                        target.line, self._make_line(end_token), end_token
+                    ),
+                    node_id=self.id_alloc.alloc(),
+                )
+
+                has_access = True
+
             else:
-                self.print_error("Syntax Error: Expected field name after '.'")
+                break
 
-        if self.peek_kind() == "LBRACKET":
-            c = self.parse_list_literal()
-            chain.append(c)
-
-        return start_token[1], chain
+        return target_name, target if has_access else None
 
     def check_function_call(self):
         start_index = self.index
@@ -707,14 +744,14 @@ class Parser:
         type = self.parse_type()
 
         comp = self.get_compound_assignment()
-        target_name, chain = self.parse_chain_target()
+        target_name, field = self.parse_chain_target()
 
         data_type = type
 
-        if data_type and chain:
-            target_path = f"{target_name}.{'.'.join(chain)}"
+        if data_type and field is not None:
             self.print_error(
-                f"Syntax Error: Cannot use type annotation '{data_type}' on member access '{target_path}'.\n"
+                f"Syntax Error: Cannot use type annotation '{data_type}' "
+                f"on member access '{target_name}'.\n"
                 f"  --> Fields already have a type defined in their class."
             )
 
@@ -726,10 +763,22 @@ class Parser:
         if self.peek_kind() in ASSIGN_TOKENS:
             op_token = self.consume(self.peek_kind())
             value_ast = self.parse_expression()
+
             if comp:
                 op_line = self._make_line(op_token)
+
+                target_ast = (
+                    field
+                    if field is not None
+                    else VariableAST(
+                        name=target_name,
+                        line=op_line,
+                        node_id=self.id_alloc.alloc(),
+                    )
+                )
+
                 value_ast = BinaryOpAST(
-                    left=VariableAST(name=target_name, line=op_line),
+                    left=target_ast,
                     op=comp,
                     right=value_ast,
                     line=op_line,
@@ -740,11 +789,13 @@ class Parser:
         line = self._make_line(start_token, end_token)
 
         if is_definition:
-            if chain:
+            if field is not None:
                 self.print_error(
-                    f"Syntax Error: Cannot use type annotation '{data_type}' on member access '{target_path}'.\n"
+                    f"Syntax Error: Cannot use type annotation '{data_type}' "
+                    f"on member access '{target_name}'.\n"
                     f"  --> Fields already have a type defined in their class."
                 )
+
             return DefinitionAST(
                 target=target_name,
                 type=data_type,
@@ -755,7 +806,7 @@ class Parser:
 
         return AssignAST(
             target=target_name,
-            chain=chain,
+            field=field,
             type=data_type,
             value=value_ast,
             line=line,
