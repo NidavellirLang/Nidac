@@ -182,7 +182,12 @@ class IRPasser:
             else:
                 raise Exception(f"No IR generated for {b}")
 
-        struct = StructIR(ir.name, assignments, ir.fields)
+        fields = []
+        for field in assignments:
+            fields.append((field.target, field.type, field.value))
+
+        struct = StructIR(ir.name, assignments, fields)
+        # raise Exception(struct)
 
         methods = [fn for fn in functions if fn.ast_name != "__init__"]
 

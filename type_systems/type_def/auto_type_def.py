@@ -78,7 +78,7 @@ class AutoTypeDefEngine:
                     sym.type = types
                     if sym.type is None:
                         raise NidavellirTypeError(
-                            "Cannot determine type of assigned value",
+                            f"Cannot determine type of assigned value {sym}",
                             sym.ast_node.line,
                         )
         elif sym.uses:
@@ -419,58 +419,44 @@ class AutoTypeDefEngine:
         if target.type is None:
             self.process(target)
 
-        self._resolve_chain(target.type, sym.chain, sym)
+        field = sym.chain
 
-    def _resolve_chain(self, base_type, chain, sym):
-        for name in chain:
-            if not isinstance(base_type, ClassType):
-                raise NidavellirTypeError(
-                    f"Cannot access member '{name}' on non-class type '{base_type}'",
-                    sym.ast_node.line,
-                )
-
-            class_sym = self._find_class(base_type.name)
+        if isinstance(target.type, ClassType):
+            class_sym = self._find_class(target.type.name)
             if class_sym is None:
                 raise NidavellirTypeError(
-                    f"Class '{base_type.name}' is not defined", sym.ast_node.line
+                    f"Class '{target.type.name}' not found", sym.ast_node.line
                 )
 
-            field_ast = class_sym.fields.get(name)
-            if field_ast is None:
+            field_sym = class_sym.field_syms.get(field.name)
+            # raise Exception(class_sym)
+            field_name = field_sym.name
+            if field_sym is None:
                 raise NidavellirTypeError(
-                    f"Member '{name}' is not defined in class '{base_type.name}'",
+                    f"Field '{sym.field_name}' not found in class '{target.type.name}'",
                     sym.ast_node.line,
                 )
 
-            base_type = self._field_type(class_sym, field_ast)
-            if base_type is None:
+            field.lookup = field_sym
+            field.field_name = field_name
+            if field_sym.type is None:
+                self.process(field_sym)
+
+            if field_sym.type is None:
                 raise NidavellirTypeError(
-                    f"Cannot determine type of member '{name}' in class '{base_type.name}'",
+                    f"Cannot determine type of field '{field.name}' in class '{target.type.name}'",
                     sym.ast_node.line,
                 )
 
-        with TypeUpdate(sym):
-            sym.type = base_type
+            with TypeUpdate(field):
+                field.type = field_sym.type
+                sym.type = field_sym.type
+        return
 
     def _find_class(self, name):
         for sym in self.sym_tree:
             if isinstance(sym, ClassSymbol) and sym.name == name:
                 return sym
-
-        return None
-
-    def _field_type(self, class_sym, field_ast):
-        if field_ast.type is not None:
-            return resolve_type(field_ast.type)
-
-        if field_ast.value is not None:
-            value_sym = field_ast.value
-            if value_sym.type is not None:
-                return value_sym.type
-
-            self.process(value_sym)
-            if value_sym.type is not None:
-                return value_sym.type
 
         return None
 

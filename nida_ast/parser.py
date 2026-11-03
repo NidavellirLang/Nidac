@@ -282,18 +282,22 @@ class Parser:
             kind = self.peek_kind()
 
             if kind == "DOT":
-                chain = []
-                member_token = None
-                while self.peek_kind() == "DOT":
-                    self.advance()
-                    member_token = self.consume("NAME")
-                    chain.append(member_token[1])
+                self.advance()
+                member_token = self.consume("NAME")
 
-                line = self._span_line(
-                    left.line, self._make_line(member_token), member_token
+                field = IdentifierAST(
+                    name=member_token[1],
+                    line=self._make_line(member_token),
+                    node_id=self.id_alloc.alloc(),
                 )
+
+                line = self._span_line(left.line, field.line, member_token)
+
                 left = FieldAccessAST(
-                    target=left, chain=chain, line=line, node_id=self.id_alloc.alloc()
+                    target=left,
+                    field=field,
+                    line=line,
+                    node_id=self.id_alloc.alloc(),
                 )
 
             elif kind == "LBRACKET":

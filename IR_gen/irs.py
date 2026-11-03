@@ -83,11 +83,10 @@ class AssignIR(IR):
 
 
 class FieldAccessIR(IR):
-    def __init__(self, target, chain, type=None, chain_types=None):
+    def __init__(self, target, field, type=None):
         self.target = target
-        self.chain = chain
+        self.field = field
         self.type = type
-        self.chain_types = chain_types or []
 
 
 class FunctionIR(IR):
@@ -286,3 +285,8 @@ class ListLiteralIR(IR):
     def __init__(self, elements, type=None):
         self.elements = elements
         self.type = type
+
+
+class IdentifierIR(IR):
+    def __init__(self, name):
+        self.name = name

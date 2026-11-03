@@ -712,8 +712,13 @@ class IRLowerer:
 
     def process_StructIR(self, hir):
         fields = []
-
+        # raise Exception(hir)
         for name, field_type, _ in hir.class_fields:
+            try:
+                self.type_to_str(field_type)
+            except:
+                raise Exception(hir)
+
             fields.append(FieldDeclLIR(name, self.type_to_str(field_type)))
 
         struct_lir = StructLIR(hir.name, fields)
@@ -743,6 +748,18 @@ class IRLowerer:
 
         result_id = self.get_value_id()
         lir = UnaryOpLIR(result_id, op, value_lir.name, type_str)
+        self.blocks.emit(lir)
+
+        return lir
+
+    def process_FieldAccessIR(self, hir):
+        # raise Exception(hir)
+        target_lir = self.process(hir.target)
+        target_id = self.get_current_value_id()
+        type_str = self.str_of(hir)
+
+        result_id = self.get_value_id()
+        lir = FieldAccessLIR(result_id, target_id, hir.field, type_str)
         self.blocks.emit(lir)
 
         return lir

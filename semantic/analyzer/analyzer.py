@@ -35,7 +35,7 @@ class SymbolTreeBuilder:
         resolved = resolve_type(type_val)
 
         if resolved is None and isinstance(type_val, str):
-            if isinstance(self.stm.lookup(type_val), ClassSymbol):
+            if isinstance(self.stm.lookup_class_name(type_val), ClassSymbol):
                 return ClassType(type_val)
 
         return resolved
@@ -539,8 +539,10 @@ class SymbolTreeBuilder:
                     class_sym.fields[b.chain[0]] = b
                 else:
                     class_sym.fields[b.target] = b
+
+                class_sym.field_syms[b.target] = res
             elif isinstance(b, FunctionAST):
-                fn_res = self.process_stmt(b)
+                fn_res = res
                 if b.name == "__init__":
                     class_sym.init_fn = fn_res
                     params = []
@@ -563,13 +565,18 @@ class SymbolTreeBuilder:
 
         return class_sym
 
+    def eval_IdentifierAST(self, ast):
+        name = ast.name
+        return IdentifierSymbol(name, ast)
+
     def eval_FieldAccessAST(self, ast):
         target = ast.target
-        chain = ast.chain
+        field = ast.field
 
+        field_sym = self.process_eval(field)
         target_sym = self.process_eval(target)
 
-        return FieldAccessSymbol(target_sym, chain, ast)
+        return FieldAccessSymbol(target_sym, field_sym, ast)
 
     def eval_SelfAST(self, ast):
         if self.current_class_name is None:
@@ -612,7 +619,13 @@ class SymbolTreeBuilder:
 
     def type_analysis(self, ast):
         if hasattr(ast, "type"):
-            ast.type = resolve_type(ast.type)
+            types = ast.type
+            if isinstance(types, str):
+                lk_c = self.stm.lookup_class_name(types)
+                if lk_c is not None:
+                    cl_type = ClassType(types)
+                else:
+                    ast.type = resolve_type(ast.type)
 
         if hasattr(ast, "body"):
             for b in ast.body:
@@ -626,6 +639,7 @@ class SymbolTreeBuilder:
         # self.declare(self.ast_tree)
 
         res = self.process_from_list(self.ast_tree)
+        # breakpoint()
         self.st.extend(res)
 
     def print_scopes(self, st=None):

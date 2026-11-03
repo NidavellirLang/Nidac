@@ -324,6 +324,7 @@ class ClassSymbol(Symbol):
         self.params = None
 
         self.fields = {}
+        self.field_syms = {}
         self.methods = {}
 
         self.method_syms = {}
@@ -395,3 +396,15 @@ class MergeAssignmentSymbol(Symbol):
         self.ast_node = ast_node
 
         self.norm_debug_name = norm_debug_name
+
+
+class IdentifierSymbol(Symbol):
+    def __init__(self, name, ast_node):
+        self.name = name
+        self.ast_node = ast_node
+        self.lookup = None
+        self.field_name = None
+        self.type = None
+
+    def set_type_to_AST(self):
+        self.ast_node.type = self.type

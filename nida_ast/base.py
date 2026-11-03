@@ -212,7 +212,7 @@ class DecoratorAST(AST):
 @dataclass(slots=True, repr=False)
 class FieldAccessAST(AST):
     target: AST
-    chain: list
+    field: IdentifierAST
 
 
 @dataclass(slots=True, repr=False)
@@ -250,3 +250,8 @@ class GroupAST(AST):
 @dataclass(slots=True, repr=False)
 class NoneAST(AST):
     pass
+
+
+@dataclass(slots=True)
+class IdentifierAST(AST):
+    name: str

@@ -40,8 +40,7 @@ class IRGen:
 
         target = lk.name
 
-        if var_type is None:
-            var_type = lk.type
+        var_type = lk.type
 
         is_re_assign = lk.is_re_assign
 
@@ -79,16 +78,23 @@ class IRGen:
 
         return type_val
 
+    def _get_name_from_IdentifierAST(self, ast):
+        lk = self.get_lk(ast)
+        field_name = lk.field_name
+        return field_name
+
     def gen_FieldAccessAST(self, ast):
+        lk = self.get_lk(ast)
         target_ir = self.gen(ast.target)
-        chain = getattr(ast, "chain", []) or []
-        chain_types = getattr(ast, "chain_types", []) or []
+        field = ast.field
+
+        idn_lk = self.get_lk(ast.field)
+        idn_name = self._get_name_from_IdentifierAST(field)
 
         return FieldAccessIR(
             target_ir,
-            chain,
-            self._type_of(ast.type),
-            [self._type_of(t) for t in chain_types],
+            idn_name,
+            self._type_of(lk.type),
         )
 
     def gen_SelfAST(self, ast):
