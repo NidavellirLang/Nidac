@@ -111,9 +111,8 @@ class AutoTypeDefEngine:
                     "Cannot determine type of assigned value", sym.ast_node.line
                 )
 
-        if sym.field:
-
-            self.process(sym.field)
+        if sym.fields:
+            self.process(sym.fields)
 
     def process_DefinitionSymbol(self, sym):
         if sym.type is None:
@@ -199,7 +198,6 @@ class AutoTypeDefEngine:
                 continue
 
             offset = getattr(call, "arg_offset", 0)
-
             for idx, arg in enumerate(call.args):
                 if arg.type is None:
                     self.process(arg)
@@ -224,7 +222,14 @@ class AutoTypeDefEngine:
             if arg.type is None:
                 arg_type = arg_types.get(idx)
                 if arg_type is None:
-                    continue
+                    self.process(arg)
+                    arg_type = arg.type
+
+                if arg_type is None:
+                    raise NidavellirTypeError(
+                        f"Cannot infer argument type at position {idx} in function '{sym.name}'",
+                        sym.ast_node.line,
+                    )
 
                 with TypeUpdate(arg):
                     arg.type = arg_type
@@ -250,6 +255,8 @@ class AutoTypeDefEngine:
         elif sym.type is None:
             with TypeUpdate(sym):
                 sym.type = NoneType()
+
+        # raise Exception(sym.args)
 
     def process_ReturnSymbol(self, sym):
         if sym.value is None:

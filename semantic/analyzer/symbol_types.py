@@ -1,26 +1,131 @@
-from type_systems.types import resolve_type, StringType, NoneType, ClassType
+from type_systems.types import resolve_type, StringType, NoneType, ClassType, Type
+from dataclasses import dataclass, fields, field
+from nida_ast.base import AST, IntrinsicAST
 
 
+@dataclass(slots=True, repr=False, kw_only=True)
 class Symbol:
-    def _format(self, indent=0, seen=None):
+    type: Type | None = None
+    ast_node: AST | None = None
+    uses: list[Symbol] = field(default_factory=list)
+
+    _FORMAT_SKIP = {"ast_node"}
+    _FORMAT_MAX_ITEMS = 5
+    _FORMAT_MAX_DEPTH = 2
+    _FORMAT_MAX_VALUE_LEN = 100
+
+    @staticmethod
+    def _symbol_ref(value):
+        cls = type(value).__name__
+
+        name = getattr(value, "name", None)
+        if name is None:
+            name = getattr(value, "value", None)
+
+        symbol_type = getattr(value, "type", None)
+
+        parts = [cls]
+
+        if name is not None:
+            parts.append(repr(name))
+
+        if symbol_type is not None:
+            type_name = type(symbol_type).__name__
+            parts.append(f"type={type_name}")
+
+        parts.append(f"@{id(value):x}")
+
+        return f"<{' '.join(parts)}>"
+
+    @classmethod
+    def _format_value(cls, value):
+        if isinstance(value, Symbol):
+            return cls._symbol_ref(value)
+
+        if isinstance(value, list):
+            count = len(value)
+            if not count:
+                return "[]"
+
+            items = [cls._format_value(v) for v in value[: cls._FORMAT_MAX_ITEMS]]
+
+            suffix = f", ... +{count - len(items)}" if count > len(items) else ""
+            return f"[{', '.join(items)}{suffix}]"
+
+        if isinstance(value, dict):
+            count = len(value)
+            if not count:
+                return "{}"
+
+            items = [
+                f"{k!r}: {cls._format_value(v)}"
+                for k, v in list(value.items())[: cls._FORMAT_MAX_ITEMS]
+            ]
+
+            suffix = f", ... +{count - len(items)}" if count > len(items) else ""
+            return f"{{{', '.join(items)}{suffix}}}"
+
+        if hasattr(value, "__dict__"):
+            cls_name = type(value).__name__
+
+            name = getattr(value, "name", None)
+            node_id = getattr(value, "node_id", None)
+
+            parts = [cls_name]
+
+            if name is not None:
+                parts.append(repr(name))
+
+            if node_id is not None:
+                parts.append(f"id={node_id}")
+
+            return f"<{' '.join(parts)} @{id(value):x}>"
+
+        if type(value).__name__.endswith("Type"):
+            return repr(value)
+
+        result = repr(value)
+
+        limit = cls._FORMAT_MAX_VALUE_LEN
+        if len(result) > limit:
+            result = result[: limit - 3] + "..."
+
+        return result
+
+    def _format(
+        self,
+        indent=0,
+        seen=None,
+        *,
+        verbose=False,
+        max_depth=None,
+        max_items=None,
+    ):
         if seen is None:
             seen = set()
 
+        if max_depth is None:
+            max_depth = self._FORMAT_MAX_DEPTH
+
+        if max_items is None:
+            max_items = self._FORMAT_MAX_ITEMS
+
         prefix = "  " * indent
-        class_name = self.__class__.__name__
+        class_name = type(self).__name__
 
         if id(self) in seen:
-            return f"{prefix}{class_name}(...)"
+            return f"{prefix}{self._symbol_ref(self)}"
 
         seen.add(id(self))
 
         attrs = {
             k: v
-            for k, v in self.__dict__.items()
-            if not k.startswith("_") and k != "ast_node"
+            for k, v in vars(self).items()
+            if not k.startswith("_") and k not in self._FORMAT_SKIP
         }
 
         if not attrs:
+            seen.remove(id(self))
             return f"{prefix}{class_name}()"
 
         lines = [f"{prefix}{class_name}:"]
@@ -29,36 +134,66 @@ class Symbol:
             field_prefix = f"{prefix}  {key}:"
 
             if isinstance(value, Symbol):
-                lines.append(field_prefix)
-                lines.append(value._format(indent + 2, seen))
+                if verbose and indent < max_depth:
+                    lines.append(field_prefix)
+                    lines.append(
+                        value._format(
+                            indent + 2,
+                            seen,
+                            verbose=True,
+                            max_depth=max_depth,
+                            max_items=max_items,
+                        )
+                    )
+                else:
+                    lines.append(f"{field_prefix} {self._format_value(value)}")
 
-            elif isinstance(value, list):
-                if not value:
-                    lines.append(f"{field_prefix} []")
+            elif isinstance(value, (list, dict)):
+                count = len(value)
+
+                if not count:
+                    lines.append(
+                        f"{field_prefix} {'[]' if isinstance(value, list) else '{}'}"
+                    )
+                    continue
+
+                if not verbose or indent >= max_depth:
+                    lines.append(f"{field_prefix} {self._format_value(value)}")
                     continue
 
                 lines.append(field_prefix)
 
-                for item in value:
-                    if isinstance(item, Symbol):
-                        lines.append(f"{prefix}    -")
-                        lines.append(item._format(indent + 3, seen))
+                items = list(value.items()) if isinstance(value, dict) else value
+
+                for i, item in enumerate(items[:max_items]):
+                    if isinstance(value, dict):
+                        item_key, item_value = item
                     else:
-                        lines.append(f"{prefix}    - {self._format_value(item)}")
+                        item_key, item_value = None, item
 
-            elif isinstance(value, dict):
-                if not value:
-                    lines.append(f"{field_prefix} {{}}")
-                    continue
+                    item_prefix = "  " * (indent + 2)
 
-                lines.append(field_prefix)
+                    if isinstance(item_value, Symbol):
+                        label = f"{item_key!r}:" if item_key is not None else "-"
 
-                for k, v in value.items():
-                    if isinstance(v, Symbol):
-                        lines.append(f"{prefix}    {k}:")
-                        lines.append(v._format(indent + 3, seen))
+                        lines.append(f"{item_prefix}{label}")
+                        lines.append(
+                            item_value._format(
+                                indent + 3,
+                                seen,
+                                verbose=True,
+                                max_depth=max_depth,
+                                max_items=max_items,
+                            )
+                        )
                     else:
-                        lines.append(f"{prefix}    {k}: {self._format_value(v)}")
+                        label = f"{item_key!r}: " if item_key is not None else "- "
+                        lines.append(
+                            f"{item_prefix}{label}" f"{self._format_value(item_value)}"
+                        )
+
+                if count > max_items:
+                    lines.append(f"{item_prefix}... +{count - max_items} more")
 
             else:
                 lines.append(f"{field_prefix} {self._format_value(value)}")
@@ -66,345 +201,241 @@ class Symbol:
         seen.remove(id(self))
         return "\n".join(lines)
 
-    @staticmethod
-    def _format_value(value):
-        if isinstance(value, Symbol):
-            return f"<{type(value).__name__}>"
-
-        if isinstance(value, list):
-            return repr(value)
-
-        if isinstance(value, dict):
-            return repr(value)
-
-        if hasattr(value, "__class__") and (value.__class__.__name__.endswith("Type")):
-            return repr(value)
-
-        return repr(value)
-
     def __repr__(self):
         return self._format()
 
+    def debug(self, *, max_depth=4, max_items=10):
+        return self._format(
+            verbose=True,
+            max_depth=max_depth,
+            max_items=max_items,
+        )
 
+
+@dataclass(slots=True, repr=False)
 class AssignSymbol(Symbol):
-    def __init__(self, name, type, value, ast_node, re_assign=None):
-        self.name = name
-        self.type = resolve_type(type)
-        self.value = value
+    name: str
+    value: Symbol | None
 
-        self.ast_node = ast_node
-
-        self.parent_assign = None
-
-        self.uses = []
-
-        self.field = None
-        self.base_sym = None
-
-        self.is_re_assign = re_assign
-
-    def set_type_to_AST(self):
-        self.ast_node.type = self.type
-        if self.parent_assign is not None and not self.chain:
-            self.parent_assign.type = self.type
-            self.parent_assign.set_type_to_AST()
+    fields: FieldAccessSymbol | None = None
+    parent_assign: AssignSymbol | None = None
 
 
-class DefinitionSymbol(Symbol):
-    def __init__(self, name, type, value, ast_node):
-        self.name = name
-        self.type = resolve_type(type)
-        self.value = value
-        self.ast_node = ast_node
-
-        self.parent_assign = None
-
-        self.uses = []
-
-    def set_type_to_AST(self):
-        self.ast_node.type = self.type
+@dataclass(slots=True, repr=False)
+class DefinitionSymbol(AssignSymbol):
+    pass
 
 
+@dataclass(slots=True, repr=False)
 class NumberSymbol(Symbol):
-    def __init__(self, value, ast_node):
-        self.value = value
-        self.ast_node = ast_node
-
-        self.type = None
-
-    def set_type_to_AST(self):
-        self.ast_node.type = self.type
+    value: int | float
 
 
+@dataclass(slots=True, repr=False)
 class StringSymbol(Symbol):
-    def __init__(self, value, ast_node):
-        self.value = value
-        self.ast_node = ast_node
-
-        self.type = StringType()
-
-    def set_type_to_AST(self):
-        self.ast_node.type = self.type
+    value: str
 
 
+@dataclass(slots=True, repr=False)
 class NoneSymbol(Symbol):
-    def __init__(self, ast_node):
-        self.ast_node = ast_node
-
-        self.type = NoneType()
-
-    def set_type_to_AST(self):
-        self.ast_node.type = self.type
+    pass
 
 
+@dataclass(slots=True, repr=False)
 class FunctionSymbol(Symbol):
-    def __init__(self, name, type, args, ast_node, is_variadic=False):
-        self.name = name
-        self.type = resolve_type(type)
-        self.args = args
-        self.ast_node = ast_node
-        self.is_variadic = is_variadic
-
-        self.body = []
-
-        self.uses = []
-        self.returned = []
-
-        self.is_called = False
-
-    def set_type_to_AST(self):
-        self.ast_node.type = self.type
+    name: str
+    args: list[Symbol] = field(default_factory=list)
+    body: list[Symbol] = field(default_factory=list)
+    returned: list[Symbol] = field(default_factory=list)
+    is_called: bool = False
 
 
+@dataclass(slots=True, repr=False)
 class ReturnSymbol(Symbol):
-    def __init__(self, value, ast_node):
-        self.value = value
-        self.ast_node = ast_node
+    value: Symbol | None
 
 
+@dataclass(slots=True, repr=False)
 class CallSymbol(Symbol):
-    def __init__(self, name, args, lookup, ast_node):
-        self.name = name
-        self.args = args
-        self.lookup = lookup
-        self.ast_node = ast_node
-
-        self.receiver_chain = []
-
-        self.arg_offset = 0
-
-        self.type = None
-
-    def set_type_to_AST(self):
-        self.ast_node.type = self.type
+    name: str
+    args: list[Symbol] = field(default_factory=list)
+    lookup: Symbol | None = None
 
 
+@dataclass(slots=True, repr=False)
 class IntrinsicCallSymbol(Symbol):
-    def __init__(self, intrinsic, name, args, ast_node):
-        self.intrinsic = intrinsic
-        self.name = name
-        self.args = args
-        self.ast_node = ast_node
-
-        self.type = None
+    name: str
+    args: list[Symbol] = field(default_factory=list)
+    intrinsic: IntrinsicAST | None = None
 
 
+@dataclass(slots=True, repr=False)
 class VariableSymbol(Symbol):
-    def __init__(self, name, lookup, ast_node):
-        self.name = name
-        self.lookup = lookup
-        self.ast_node = ast_node
-
-        self.type = None
-
-    def set_type_to_AST(self):
-        self.ast_node.type = self.type
+    name: str
+    lookup: Symbol
 
 
+@dataclass(slots=True, repr=False)
 class BinaryOpSymbol(Symbol):
-    def __init__(self, op, left_sym, right_sym, ast_node=None):
-        self.op = op
-        self.left_sym = left_sym
-        self.right_sym = right_sym
-        self.ast_node = ast_node
-
-        self.type = None
-
-        self.max_val = None
-        self.min_val = None
-
-    def set_type_to_AST(self):
-        self.ast_node.type = self.type
+    op: Symbol
+    left_sym: Symbol
+    right_sym: Symbol
 
 
+@dataclass(slots=True, repr=False)
 class UnaryOpSymbol(Symbol):
-    def __init__(self, op, right_sym, ast_node=None):
-        self.op = op
-        self.right_sym = right_sym
-        self.ast_node = ast_node
-
-        self.type = None
-
-    def set_type_to_AST(self):
-        self.ast_node.type = self.type
+    op: Symbol
+    right_sym: Symbol
 
 
+@dataclass(slots=True, repr=False)
 class ForSymbol(Symbol):
-    def __init__(self, target, source, body, loop_count, ast_node):
-        self.target = target
-        self.source = source
-        self.ast_node = ast_node
-        self.body = body
-        self.loop_count = loop_count
+    pass
+    # TODO: impl
+    # def __init__(self, target, source, body, loop_count, ast_node):
+    #     self.target = target
+    #     self.source = source
+    #     self.ast_node = ast_node
+    #     self.body = body
+    #     self.loop_count = loop_count
 
-        self.type = None
+    #     self.type = None
 
 
+@dataclass(slots=True, repr=False)
 class UnavailableSymbol(Symbol):
-    def __init__(self, why, ast_node):
-        self.why = why
-        self.ast_node = ast_node
+    why: str
 
 
+@dataclass(slots=True, repr=False)
 class IfSymbol(Symbol):
-    def __init__(
-        self,
-        cond,
-        body,
-        elifs,
-        else_body,
-        ast_node,
-        body_scope,
-        else_scope=None,
-        merges=None,
-    ):
-        self.cond = cond
-        self.body = body
-        self.body_scope = body_scope
+    pass
+    # TODO: impl
+    # def __init__(
+    #     self,
+    #     cond,
+    #     body,
+    #     elifs,
+    #     else_body,
+    #     ast_node,
+    #     body_scope,
+    #     else_scope=None,
+    #     merges=None,
+    # ):
+    #     self.cond = cond
+    #     self.body = body
+    #     self.body_scope = body_scope
 
-        self.elifs = elifs
-        self.else_body = else_body
-        self.else_scope = else_scope
+    #     self.elifs = elifs
+    #     self.else_body = else_body
+    #     self.else_scope = else_scope
 
-        self.ast_node = ast_node
+    #     self.ast_node = ast_node
 
-        self.merges = merges
+    #     self.merges = merges
 
 
+@dataclass(slots=True, repr=False)
 class ElifSymbol(Symbol):
-    def __init__(self, cond, body, ast_node, scope):
-        self.cond = cond
-        self.body = body
-        self.scope = scope
-        self.ast_node = ast_node
+    pass
+    # TODO: impl
+    # def __init__(self, cond, body, ast_node, scope):
+    #     self.cond = cond
+    #     self.body = body
+    #     self.scope = scope
+    #     self.ast_node = ast_node
 
 
+@dataclass(slots=True, repr=False)
 class WhileSymbol(Symbol):
-    def __init__(self, cond, body, ast_node):
-        self.cond = cond
-        self.body = body
-        self.ast_node = ast_node
+    pass
+    # TODO: impl
+    # def __init__(self, cond, body, ast_node):
+    #     self.cond = cond
+    #     self.body = body
+    #     self.ast_node = ast_node
 
 
+@dataclass(slots=True, repr=False)
 class BooleanSymbol(Symbol):
-    def __init__(self, value, ast_node):
-        self.value = value
-        self.ast_node = ast_node
-        self.type = None
+    value: bool
 
 
+@dataclass(slots=True, repr=False)
 class ClassSymbol(Symbol):
-    def __init__(self, name, ast_node):
-        self.name = name
-        self.ast_node = ast_node
+    pass
+    # TODO: impl
+    # def __init__(self, name, ast_node):
+    #     self.name = name
+    #     self.ast_node = ast_node
 
-        self.body = []
+    #     self.body = []
 
-        self.init_fn = None
-        self.params = None
+    #     self.init_fn = None
+    #     self.params = None
 
-        self.fields = {}
-        self.field_syms = {}
-        self.methods = {}
+    #     self.fields = {}
+    #     self.field_syms = {}
+    #     self.methods = {}
 
-        self.method_syms = {}
+    #     self.method_syms = {}
 
-        self.uses = []
+    #     self.uses = []
 
-        self.type = ClassType(name)
-
-    def set_type_to_AST(self):
-        self.ast_node.type = self.type
+    #     self.type = ClassType(name)
 
 
+@dataclass(slots=True, repr=False)
 class FieldAccessSymbol(Symbol):
-    def __init__(self, target, chain, ast_node):
-        self.target = target
-        self.chain = chain
-        self.ast_node = ast_node
-
-        self.type = None
-
-    def set_type_to_AST(self):
-        self.ast_node.type = self.type
+    target: Symbol
+    field: FieldAccessSymbol
 
 
+@dataclass(slots=True, repr=False)
 class SelfSymbol(Symbol):
-    def __init__(self, ast_node, class_name=None):
-        self.ast_node = ast_node
-        self.class_name = class_name
-
-        self.type = None
-
-    def set_type_to_AST(self):
-        if hasattr(self.ast_node, "chain"):
-            return
-
-        self.ast_node.type = self.type
+    class_name: str | None = None
 
 
+@dataclass(slots=True, repr=False)
 class ConstructorCallSymbol(Symbol):
-    def __init__(self, name, args, lookup, ast_node):
-        self.name = name
-        self.args = args
-        self.lookup = lookup
-        self.ast_node = ast_node
+    pass
+    # TODO: impl
+    # def __init__(self, name, args, lookup, ast_node):
+    #     self.name = name
+    #     self.args = args
+    #     self.lookup = lookup
+    #     self.ast_node = ast_node
 
-        self.arg_offset = 1
+    #     self.arg_offset = 1
 
-        self.type = None
-
-    def set_type_to_AST(self):
-        self.ast_node.type = self.type
+    #     self.type = None
 
 
+@dataclass(slots=True, repr=False)
 class ListLiteralSymbol(Symbol):
-    def __init__(self, elements, ast_node):
-        self.elements = elements
-        self.appended_elements = []
-        self.ast_node = ast_node
+    pass
+    # TODO: impl
+    # def __init__(self, elements, ast_node):
+    #     self.elements = elements
+    #     self.appended_elements = []
+    #     self.ast_node = ast_node
 
-        self.type = None
-
-    def set_type_to_AST(self):
-        self.ast_node.type = self.type
+    #     self.type = None
 
 
+@dataclass(slots=True, repr=False)
 class MergeAssignmentSymbol(Symbol):
-    def __init__(self, assign_sym, ast_node, norm_debug_name=None):
-        self.merge_assign_sym = assign_sym
-        self.ast_node = ast_node
-
-        self.norm_debug_name = norm_debug_name
+    merge_sym: AssignSymbol
+    debug_name: str
 
 
+@dataclass(slots=True, repr=False)
 class IdentifierSymbol(Symbol):
-    def __init__(self, name, ast_node):
-        self.name = name
-        self.ast_node = ast_node
-        self.lookup = None
-        self.field_name = None
-        self.type = None
-
-    def set_type_to_AST(self):
-        self.ast_node.type = self.type
+    pass
+    # TODO: impl
+    # def __init__(self, name, ast_node):
+    #     self.name = name
+    #     self.ast_node = ast_node
+    #     self.lookup = None
+    #     self.field_name = None
+    #     self.type = None

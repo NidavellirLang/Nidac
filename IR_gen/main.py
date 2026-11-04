@@ -42,7 +42,7 @@ class IRGen:
 
         var_type = lk.type
 
-        is_re_assign = lk.is_re_assign
+        is_re_assign = lk.parent_assign is not None
 
         field = ast.field
         field_ir = self.gen(field) if field is not None else None
