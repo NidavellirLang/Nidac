@@ -263,9 +263,9 @@ class IRPasser:
         assigns = []
 
         for merge in merges:
-            assign_sym = merge.merge_assign_sym
+            assign_sym = merge.merge_sym
 
-            if assign_sym.is_re_assign is not None:
+            if assign_sym.parent_assign is not None:
                 continue
 
             assign_ir = AssignIR(

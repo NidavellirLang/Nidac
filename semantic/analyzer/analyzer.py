@@ -365,186 +365,185 @@ class SymbolTreeBuilder:
 
     def process_branch(self, body, scope_type):
         scope = self.stm.enter_scope(scope_type)
-
         symbols = self.process_from_list(body)
-
         self.stm.exit_scope()
 
         assignments = scope.registry.norm_assignments
-
         return symbols, scope, assignments
 
-    # TODO: implement if, elif, else
+    def process_elifs(self, elifs) -> tuple[list | None, list | None]:
+        if not elifs:
+            return None, None
 
-    # def extend_dicts(self, root, ext):
-    #     for k, v in ext.items():
-    #         if k in root:
-    #             continue
+        elif_assignments = []
+        elif_syms = []
 
-    #         root[k] = v
+        for elf in elifs:
+            cond_sym = self.process_eval(elf.cond)
+            body_sym, scope, assignments = self.process_branch(
+                elf.body,
+                "elif",
+            )
 
-    # def process_elifs(self, elifs) -> tuple[list, list]:
-    #     if not elifs or elifs is None:
-    #         return None, None
+            elif_sym = ElifSymbol(
+                cond=cond_sym,
+                body=body_sym,
+                ast_node=elf,
+            )
 
-    #     elif_assignments = []
-    #     elif_syms = []
-    #     for elf in elifs:
-    #         cond_sym = self.process_eval(elf.cond)
-    #         body_sym, scope, assignments = self.process_branch(elf.body, "elif")
-    #         elif_syms.append(ElifSymbol(cond_sym, body_sym, elf, scope))
+            elif_syms.append(elif_sym)
+            elif_assignments.append(assignments)
 
-    #         elif_assignments.append(assignments)
+        return elif_assignments, elif_syms
 
-    #     return elif_assignments, elif_syms
+    def link_merge(self, assign, name_assign):
+        if isinstance(assign, MergeAssignmentSymbol):
+            assign = assign.merge_sym
 
-    # def check_name_exists_from_all_elifs(self, elif_assigns, name):
-    #     for elif_assign in elif_assigns:
-    #         if name not in elif_assign:
-    #             return False
+        if not isinstance(assign, AssignSymbol):
+            return
 
-    #     return True
+        merge = name_assign.get(assign.ast_node.target)
 
-    # def link_merge(self, assign, name_assign):
-    #     if isinstance(assign, MergeAssignmentSymbol):
-    #         assign = assign.merge_assign_sym
+        if merge is None:
+            return
 
-    #     if not isinstance(assign, AssignSymbol):
-    #         return
+        merge_sym = merge.merge_sym
+        previous_merge = assign.parent_assign
 
-    #     merge_assign = name_assign.get(assign.ast_node.target)
+        if isinstance(previous_merge, MergeAssignmentSymbol):
+            previous_merge = previous_merge.merge_sym
 
-    #     if merge_assign is None:
-    #         return
+        if previous_merge is not None and previous_merge is not merge_sym:
+            previous_merge.name = merge_sym.name
+            previous_merge.parent_assign = merge_sym
 
-    #     previous_merge = assign.is_re_assign
+            for use in previous_merge.uses:
+                use.name = merge_sym.name
+                use.parent_assign = merge_sym
 
-    #     if previous_merge is not None and previous_merge is not merge_assign:
-    #         previous_merge.name = merge_assign.name
-    #         previous_merge.is_re_assign = merge_assign
+                if use not in merge_sym.uses:
+                    merge_sym.uses.append(use)
 
-    #         for use in previous_merge.uses:
-    #             use.name = merge_assign.name
-    #             use.is_re_assign = merge_assign
+            previous_merge.uses.clear()
 
-    #             if use not in merge_assign.uses:
-    #                 merge_assign.uses.append(use)
+        assign.parent_assign = merge_sym
+        assign.name = merge_sym.name
 
-    #         previous_merge.uses.clear()
+        if assign not in merge_sym.uses:
+            merge_sym.uses.append(assign)
 
-    #     assign.is_re_assign = merge_assign
-    #     assign.name = merge_assign.name
+    def create_merges(self, assignments, branches):
+        merges = []
+        name_assign = {}
 
-    #     if assign not in merge_assign.uses:
-    #         merge_assign.uses.append(assign)
+        for name, source in assignments.items():
+            if isinstance(source, MergeAssignmentSymbol):
+                source = source.merge_sym
 
-    # def create_merges(self, assignments, branches):
-    #     merges = []
-    #     name_assign = {}
+            ast = source.ast_node
 
-    #     for name, source in assignments.items():
-    #         if isinstance(source, MergeAssignmentSymbol):
-    #             source = source.final_sym
+            merge_sym = AssignSymbol(
+                name=self.id_alloc.anon(),
+                type=ast.type,
+                value=None,
+                ast_node=ast,
+            )
 
-    #         ast = source.ast_node
+            merge = MergeAssignmentSymbol(
+                merge_sym=merge_sym,
+                debug_name=name,
+            )
 
-    #         final_sym = AssignSymbol(
-    #             self.id_alloc.anon(),
-    #             ast.type,
-    #             None,
-    #             ast,
-    #             None,
-    #         )
+            name_assign[name] = merge
+            merges.append(merge)
 
-    #         name_assign[name] = final_sym
+        for branch in branches:
+            for assign in branch.values():
+                self.link_merge(assign, name_assign)
 
-    #         merges.append(
-    #             MergeAssignmentSymbol(
-    #                 final_sym,
-    #                 ast,
-    #                 name,
-    #             )
-    #         )
+        return merges
 
-    #     for branch in branches:
-    #         for assign in branch.values():
-    #             self.link_merge(assign, name_assign)
+    def process_ifs_assignments(
+        self,
+        if_assigns: dict,
+        elif_assigns: list | None,
+        else_assigns: dict,
+    ):
+        branches = [if_assigns]
 
-    #     return merges
+        if elif_assigns:
+            branches.extend(elif_assigns)
 
-    # def process_ifs_assignments(
-    #     self, if_assigns: dict, elif_assigns: list, else_assigns: dict
-    # ):
-    #     branches = [if_assigns]
+        branches.append(else_assigns or {})
 
-    #     if elif_assigns:
-    #         branches.extend(elif_assigns)
+        all_names = set()
 
-    #     branches.append(else_assigns or {})
+        for branch in branches:
+            all_names.update(branch)
 
-    #     all_names = set()
+        assign_merge = {}
+        unavailable = {}
 
-    #     for branch in branches:
-    #         all_names.update(branch)
+        for name in all_names:
+            sources = [branch[name] for branch in branches if name in branch]
 
-    #     assign_merge = {}
-    #     unavailable = {}
+            if len(sources) == len(branches):
+                assign_merge[name] = sources[0]
+            else:
+                source = sources[0]
 
-    #     for name in all_names:
-    #         sources = [branch[name] for branch in branches if name in branch]
+                if isinstance(source, MergeAssignmentSymbol):
+                    source = source.merge_sym
 
-    #         if len(sources) == len(branches):
-    #             assign_merge[name] = sources[0]
-    #         else:
-    #             source = sources[0]
+                unavailable[name] = UnavailableSymbol(
+                    why="This variable is declared within an if statement, "
+                    "but is not defined in every branch.",
+                    ast_node=source.ast_node,
+                )
 
-    #             if isinstance(source, MergeAssignmentSymbol):
-    #                 source = source.final_sym
+        for key, val in unavailable.items():
+            self.stm.define_assignment_norm(key, val)
 
-    #             unavailable[name] = UnavailableSymbol(
-    #                 "This variable is declared within an if statement, "
-    #                 "but is not defined in every branch.",
-    #                 source.ast_node,
-    #             )
+        for key, val in assign_merge.items():
+            self.stm.define_assignment_norm(key, val)
 
-    #     for key, val in unavailable.items():
-    #         self.stm.define_assignment_norm(key, val)
+        return self.create_merges(assign_merge, branches)
 
-    #     for key, val in assign_merge.items():
-    #         self.stm.define_assignment_norm(key, val)
+    def stmt_IfAST(self, ast):
+        cond_sym = self.process_eval(ast.cond)
 
-    #     return self.create_merges(assign_merge, branches)
+        body_sym, body_scope, if_assignments = self.process_branch(
+            ast.body,
+            "if",
+        )
 
-    # def stmt_IfAST(self, ast):
-    #     cond_sym = self.process_eval(ast.cond)
+        elif_assignments, elif_syms = self.process_elifs(ast.elifs)
 
-    #     body_sym, body_scope, if_assignments = self.process_branch(ast.body, "if")
+        else_body = None
+        else_scope = None
+        else_assignments = None
 
-    #     elif_assignments, elif_syms = self.process_elifs(ast.elifs)
+        if ast.else_body is not None:
+            else_body, else_scope, else_assignments = self.process_branch(
+                ast.else_body.body,
+                "else",
+            )
 
-    #     else_body = None
-    #     else_scope = None
-    #     else_assignments = None
+        merges = self.process_ifs_assignments(
+            if_assignments,
+            elif_assignments,
+            else_assignments or {},
+        )
 
-    #     if ast.else_body is not None:
-    #         else_body, else_scope, else_assignments = self.process_branch(
-    #             ast.else_body.body, "else"
-    #         )
-
-    #     merges = self.process_ifs_assignments(
-    #         if_assignments, elif_assignments, else_assignments or {}
-    #     )
-
-    #     return IfSymbol(
-    #         cond_sym,
-    #         body_sym,
-    #         elif_syms,
-    #         else_body,
-    #         ast,
-    #         body_scope,
-    #         else_scope,
-    #         merges,
-    #     )
+        return IfSymbol(
+            cond=cond_sym,
+            body=body_sym,
+            elifs=elif_syms or [],
+            else_body=else_body,
+            merges=merges,
+            ast_node=ast,
+        )
 
     # TODO: impl
     # def stmt_WhileAST(self, ast):

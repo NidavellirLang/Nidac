@@ -318,35 +318,18 @@ class UnavailableSymbol(Symbol):
 
 @dataclass(slots=True, repr=False)
 class IfSymbol(Symbol):
-    pass
-    # TODO: impl
-    # def __init__(
-    #     self,
-    #     cond,
-    #     body,
-    #     elifs,
-    #     else_body,
-    #     ast_node,
-    #     body_scope,
-    #     else_scope=None,
-    #     merges=None,
-    # ):
-    #     self.cond = cond
-    #     self.body = body
-    #     self.body_scope = body_scope
-
-    #     self.elifs = elifs
-    #     self.else_body = else_body
-    #     self.else_scope = else_scope
-
-    #     self.ast_node = ast_node
-
-    #     self.merges = merges
+    cond: Symbol
+    body: list[Symbol]
+    elifs: list[ElifSymbol] = dc_field(default_factory=list)
+    else_body: list[Symbol] | None = None
+    merges: list[MergeAssignmentSymbol] = dc_field(default_factory=list)
 
 
 @dataclass(slots=True, repr=False)
 class ElifSymbol(Symbol):
-    pass
+    cond: Symbol
+    body: list[Symbol] = dc_field(default_factory=list)
+
     # TODO: impl
     # def __init__(self, cond, body, ast_node, scope):
     #     self.cond = cond

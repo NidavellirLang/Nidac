@@ -111,8 +111,8 @@ class AutoTypeDefEngine:
                     "Cannot determine type of assigned value", sym.ast_node.line
                 )
 
-        if sym.fields:
-            self.process(sym.fields)
+        if sym.field:
+            self.process(sym.field)
 
     def process_DefinitionSymbol(self, sym):
         if sym.type is None:
@@ -500,7 +500,7 @@ class AutoTypeDefEngine:
 
         merges = sym.merges
         for merge in merges:
-            assign_sym = merge.merge_assign_sym
+            assign_sym = merge.merge_sym
             self.process(assign_sym)
 
     def process_ListLiteralSymbol(self, sym):
