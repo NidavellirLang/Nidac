@@ -62,7 +62,7 @@ class AutoTypeDefEngine:
                 sym.type = lk_type
 
     def process_StringSymbol(self, sym):
-        pass
+        sym.type = StringType()
 
     def process_AssignSymbol(self, sym):
         if sym.value is not None:

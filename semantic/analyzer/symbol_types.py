@@ -1,28 +1,36 @@
 from type_systems.types import resolve_type, StringType, NoneType, ClassType, Type
-from dataclasses import dataclass, fields, field
+from dataclasses import dataclass, fields, field as dc_field
 from nida_ast.base import AST, IntrinsicAST
 
 
 @dataclass(slots=True, repr=False, kw_only=True)
 class Symbol:
-    type: Type | None = None
-    ast_node: AST | None = None
-    uses: list[Symbol] = field(default_factory=list)
 
-    _FORMAT_SKIP = {"ast_node"}
-    _FORMAT_MAX_ITEMS = 5
+    # Class attributes with type hints
+    type: Type | None = None  # Type of the symbol, can be None
+    ast_node: AST | None = None  # Associated AST node, can be None
+    uses: list[Symbol] = dc_field(default_factory=list)  # List of symbol uses
+
+    # Formatting configuration constants
+    _FORMAT_SKIP = {"ast_node"}  # Attributes to skip during formatting
+    _FORMAT_MAX_ITEMS = 5  # Maximum number of items to show in collections
     _FORMAT_MAX_DEPTH = 2
-    _FORMAT_MAX_VALUE_LEN = 100
+    _FORMAT_MAX_VALUE_LEN = 100  # Maximum length of string representation
 
     @staticmethod
     def _symbol_ref(value):
-        cls = type(value).__name__
 
+        # Create a string representation of a symbol reference
+        cls = type(value).__name__
+        # Get the class name of the value
+        # Try to get name or value attribute
         name = getattr(value, "name", None)
         if name is None:
             name = getattr(value, "value", None)
 
+        # Get the type of the symbol if available
         symbol_type = getattr(value, "type", None)
+        # Build parts of the reference string
 
         parts = [cls]
 
@@ -33,6 +41,7 @@ class Symbol:
             type_name = type(symbol_type).__name__
             parts.append(f"type={type_name}")
 
+        # Add memory address for unique identification
         parts.append(f"@{id(value):x}")
 
         return f"<{' '.join(parts)}>"
@@ -217,7 +226,7 @@ class AssignSymbol(Symbol):
     name: str
     value: Symbol | None
 
-    fields: FieldAccessSymbol | None = None
+    field: FieldAccessSymbol | None = None
     parent_assign: AssignSymbol | None = None
 
 
@@ -244,9 +253,9 @@ class NoneSymbol(Symbol):
 @dataclass(slots=True, repr=False)
 class FunctionSymbol(Symbol):
     name: str
-    args: list[Symbol] = field(default_factory=list)
-    body: list[Symbol] = field(default_factory=list)
-    returned: list[Symbol] = field(default_factory=list)
+    args: list[Symbol] = dc_field(default_factory=list)
+    body: list[Symbol] = dc_field(default_factory=list)
+    returned: list[Symbol] = dc_field(default_factory=list)
     is_called: bool = False
 
 
@@ -258,14 +267,14 @@ class ReturnSymbol(Symbol):
 @dataclass(slots=True, repr=False)
 class CallSymbol(Symbol):
     name: str
-    args: list[Symbol] = field(default_factory=list)
+    args: list[Symbol] = dc_field(default_factory=list)
     lookup: Symbol | None = None
 
 
 @dataclass(slots=True, repr=False)
 class IntrinsicCallSymbol(Symbol):
     name: str
-    args: list[Symbol] = field(default_factory=list)
+    args: list[Symbol] = dc_field(default_factory=list)
     intrinsic: IntrinsicAST | None = None
 
 
@@ -388,7 +397,7 @@ class ClassSymbol(Symbol):
 @dataclass(slots=True, repr=False)
 class FieldAccessSymbol(Symbol):
     target: Symbol
-    field: FieldAccessSymbol
+    field: FieldAccessSymbol | None = None
 
 
 @dataclass(slots=True, repr=False)

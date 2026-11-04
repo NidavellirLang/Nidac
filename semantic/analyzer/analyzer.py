@@ -50,14 +50,14 @@ class SymbolTreeBuilder:
         return ClassType(current)
 
     def eval_BooleanAST(self, ast):
-        return BooleanSymbol(ast.value, ast_node=ast)
+        return BooleanSymbol(value=ast.value, ast_node=ast)
 
     def eval_NumberAST(self, ast):
-        sym = NumberSymbol(ast.value, ast_node=ast)
+        sym = NumberSymbol(value=ast.value, ast_node=ast)
         return sym
 
     def eval_StringAST(self, ast):
-        return StringSymbol(ast.value, ast_node=ast)
+        return StringSymbol(value=ast.value, ast_node=ast)
 
     def eval_NoneAST(self, ast):
         return NoneSymbol(ast_node=ast)
@@ -78,7 +78,7 @@ class SymbolTreeBuilder:
 
             class_type = self.create_class_type()
             classes = self.stm.lookup_class_name(self.current_class_name)
-            vs = VariableSymbol(name, classes, ast_node=ast)
+            vs = VariableSymbol(name=name, lookup=classes, ast_node=ast)
             vs.type = class_type
             return vs
 
@@ -93,7 +93,7 @@ class SymbolTreeBuilder:
         if var is None:
             raise NidavellirNameError(f"Variable '{ast.name}' is not defined", ast.line)
 
-        return VariableSymbol(var.name, var, ast_node=ast)
+        return VariableSymbol(name=var.name, lookup=var, ast_node=ast)
 
     def eval_AssignAST(self, ast):
         return self.stmt_AssignAST(ast)
@@ -103,7 +103,9 @@ class SymbolTreeBuilder:
         left_sym = self.process_eval(ast.left)
         right_sym = self.process_eval(ast.right)
 
-        return BinaryOpSymbol(op, left_sym, right_sym, ast_node=ast)
+        return BinaryOpSymbol(
+            op=op, left_sym=left_sym, right_sym=right_sym, ast_node=ast
+        )
 
     def eval_GroupAST(self, ast):
         return self.process_eval(ast.expr)
@@ -119,27 +121,31 @@ class SymbolTreeBuilder:
         if self.current_class_name is None:
             raise NidavellirSemanticError("Cannot use self outside of class", ast.line)
 
-        self_sym = SelfSymbol(ast, self.current_class_name, ast_node=ast)
-        self_sym.type = self.create_class_type()
-        return self_sym
+        return SelfSymbol(
+            class_name=self.current_class_name,
+            type=self.create_class_type(),
+            ast_node=ast,
+        )
 
-    def eval_IdentifierAST(self, ast):
-        name = ast.name
-        return IdentifierSymbol(name, ast_node=ast)
+    # TODO: impl
+    # def eval_IdentifierAST(self, ast):
+    #     name = ast.name
+    #     return IdentifierSymbol(name, ast_node=ast)
 
     def eval_UnaryOpAST(self, ast):
         right_sym = self.process_eval(ast.right)
 
-        return UnaryOpSymbol(ast.op, right_sym, ast_node=ast)
+        return UnaryOpSymbol(op=ast.op, right_sym=right_sym, ast_node=ast)
 
-    def eval_ListLiteralAST(self, ast):
-        elements = []
+    # TODO: impl
+    # def eval_ListLiteralAST(self, ast):
+    #     elements = []
 
-        for e in ast.elements:
-            element_sym = self.process_eval(e)
-            elements.append(element_sym)
+    #     for e in ast.elements:
+    #         element_sym = self.process_eval(e)
+    #         elements.append(element_sym)
 
-        return ListLiteralSymbol(elements, ast_node=ast)
+    #     return ListLiteralSymbol(elements, ast_node=ast)
 
     def stmt_AssignAST(self, ast):
         target = ast.target
@@ -181,18 +187,19 @@ class SymbolTreeBuilder:
 
         return final_sym
 
-    def stmt_DefinitionAST(self, ast):
-        lk = self.stm.lookup(ast.target)
-        if lk is not None:
-            raise NidavellirSemanticError(
-                f"Definition of variable '{ast.target}' already exists", ast.line
-            )
+    # TODO: impl
+    # def stmt_DefinitionAST(self, ast):
+    #     lk = self.stm.lookup(ast.target)
+    #     if lk is not None:
+    #         raise NidavellirSemanticError(
+    #             f"Definition of variable '{ast.target}' already exists", ast.line
+    #         )
 
-        val = ast.value
-        val_sym = self.process_eval(val)
-        # TODO: impl
-        # self.stm.add_symbol(d := DefinitionSymbol(ast.target, ast.type, val_sym, ast))
-        return NotImplemented
+    #     val = ast.value
+    #     val_sym = self.process_eval(val)
+    #     # TODO: impl
+    #     # self.stm.add_symbol(d := DefinitionSymbol(ast.target, ast.type, val_sym, ast))
+    #     return NotImplemented
 
     def stmt_FunctionAST(self, ast):
         fn_id = self.get_id(ast)
@@ -202,7 +209,7 @@ class SymbolTreeBuilder:
 
         if fn_sym is None:
             fn_sym = FunctionSymbol(
-                fn_name,
+                name=fn_name,
                 type=self.resolve(ast.type),
                 ast_node=ast,
             )

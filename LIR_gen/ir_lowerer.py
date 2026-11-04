@@ -152,7 +152,7 @@ class IRLowerer:
         try:
             type_str = self.str_of(hir)
         except:
-            raise Exception(hir)
+            raise Exception()
 
         const_id = self.get_value_id()
         lirs = LIRs()
@@ -322,37 +322,6 @@ class IRLowerer:
         self.exit_value_scope()
 
         return FunctionLIR(name, args_lir, type_str, fn_blocks, is_static)
-
-    # def process_IntrinsicCallIR(self, hir):
-    #     lirs = LIRs()
-
-    #     name = hir.name
-    #     args = hir.args
-    #     intrinsic = hir.intrinsic
-    #     is_not_return = isinstance(self.type_of(hir), NoneType) or self.type_of(hir) is None
-    #     type_str = str(self.type_of(hir))
-
-    #     lirs = LIRs()
-    #     arg_ids = []
-
-    #     for arg in args:
-    #         lir = self.process(arg)
-    #         arg_ids.append(self.get_current_value_id())
-
-    #     if is_not_return:
-    #         nonetype = str(NoneType())
-    #         const_lir = ConstLIR(self.get_value_id(), nonetype, None)
-    #         self.blocks.emit(const_lir)
-    #         lirs.append(const_lir)
-
-    #         call_lir = CallLIR(None, type_str, name, arg_ids)
-    #     else:
-    #         call_lir = CallLIR(self.get_value_id(), type_str, name, arg_ids)
-
-    #     self.blocks.emit(call_lir)
-    #     lirs.append(call_lir)
-
-    #     return lirs
 
     def process_GroupIR(self, hir):
         return self.process(hir.expr)
@@ -749,17 +718,23 @@ class IRLowerer:
 
     def process_UnaryOpIR(self, hir):
         op = hir.op
-        value_lir = self.process(hir.value)
-        type_str = self.str_of(hir)
 
+        value_lirs = self.process(hir.value)
+        value_id = self.get_current_value_id()
+
+        type_str = self.str_of(hir)
         result_id = self.get_value_id()
-        lir = UnaryOpLIR(result_id, op, value_lir.name, type_str)
+
+        lir = UnaryOpLIR(result_id, op, value_id, type_str)
         self.blocks.emit(lir)
 
-        return lir
+        lirs = LIRs()
+        lirs.append(value_lirs)
+        lirs.append(lir)
+
+        return lirs
 
     def process_FieldAccessIR(self, hir):
-        # raise Exception(hir)
         target_lir = self.process(hir.target)
         target_id = self.get_current_value_id()
         type_str = self.str_of(hir)
@@ -769,6 +744,9 @@ class IRLowerer:
         self.blocks.emit(lir)
 
         return lir
+
+    def process_PassIR(self, hir):
+        pass
 
     def process(self, hir):
         name = hir.__class__.__name__
