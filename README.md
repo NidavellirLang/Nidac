@@ -1,5 +1,11 @@
 # Nidavellir Programming Language
 
+> **⚠️ Experimental Project — Not Ready for Production Use**
+>
+> Nidavellir is currently in an early experimental development stage and is **not yet ready for general use or production workloads**. The language, compiler architecture, syntax, and internal APIs are actively evolving and may change or break without notice.
+>
+> This repository is currently intended for experimentation, compiler development, and contributors interested in following the project's progress. Cloning or testing it is welcome, but please do not rely on it for real-world projects yet.
+
 ## Identity & Core Philosophy
 
 - **Language vs. Driver**: **Nidavellir** is the programming language (source files use the `.nida` extension). **`nidac`** is the compiler driver.
