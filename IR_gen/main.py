@@ -79,7 +79,7 @@ class IRGen:
 
     def _get_name_from_IdentifierAST(self, ast):
         lk = self.get_lk(ast)
-        field_name = lk.field_name
+        field_name = lk.resolve_name
         return field_name
 
     def gen_FieldAccessAST(self, ast):
@@ -115,7 +115,8 @@ class IRGen:
             return self.gen_IntrinsicCallAST(ast)
 
         target = lk.lookup.name
-
+        field = ast.field
+        field_ir = self.gen(field) if field is not None else None
         args = ast.args
         type = lk.type
 
@@ -123,11 +124,7 @@ class IRGen:
         for arg in args:
             args_irs.append(self.gen(arg))
 
-        if ast.chain:
-            receiver = self._gen_receiver(ast)
-            args_irs.insert(0, receiver)
-
-        ir = CallIR(target, args_irs, type)
+        ir = CallIR(target, args_irs, type, field_ir)
         return ir
 
     def gen_IntrinsicCallAST(self, ast):
@@ -374,7 +371,7 @@ class IRGen:
         fields = []
         raw_fields = lk.fields
         for key, val in raw_fields.items():
-            name = val.target
+            name = val.name
             type = val.type
             default_value = val.value
             fields.append((name, type, default_value))

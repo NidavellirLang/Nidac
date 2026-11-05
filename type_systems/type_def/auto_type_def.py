@@ -286,7 +286,7 @@ class AutoTypeDefEngine:
     def _get_function_from_target(self, target):
         if isinstance(target, FunctionSymbol):
             return False, target
-        elif isinstance(target, ClassSymbol):
+        if isinstance(target, ClassSymbol):
             return True, target
 
         if isinstance(target, VariableSymbol):
@@ -303,11 +303,16 @@ class AutoTypeDefEngine:
 
         raise Exception(target, isinstance(target, VariableSymbol))
 
-    def _set_arg_uses(self, sym, uses: list):
+    def _set_arg_uses(self, sym, uses: list, is_in_class=False):
+        # raise Exception(sym)
+        offset = 0
         for idx, arg in enumerate(sym.args):
-            arg.uses.append(uses[idx])
+            if is_in_class and idx == 0:
+                offset += 1
+                continue  # Skip SelfSymbol
+            arg.uses.append(uses[idx - offset])
 
-    def _check_args_counts(self, sym, fn_sym):
+    def _check_args_counts(self, sym, fn_sym, is_in_class=False):
         if not hasattr(sym, "args"):
             raise NidavellirInternalError(
                 f"Symbol '{sym.ast_node.target}' does not have arguments",
@@ -326,20 +331,52 @@ class AutoTypeDefEngine:
             f"{len(fn_sym.args)} arguments, but {len(sym.args)} were provided"
         )
 
-        if len(fn_sym.args) != len(sym.args):
-            raise NidavellirTypeError(
-                message,
-                sym.ast_node.line,
-            )
+        args_not_allowed_error = NidavellirTypeError(
+            message,
+            sym.ast_node.line,
+        )
+
+        if len(fn_sym.args) != len(sym.args) and not is_in_class:
+            raise args_not_allowed_error
+
+        if len(fn_sym.args) != len(sym.args) and is_in_class:
+            if isinstance(fn_sym.args[0], SelfSymbol) and (len(fn_sym.args) - 1) != len(
+                sym.args
+            ):
+                raise args_not_allowed_error
+
+    def get_target_fn_from_field(self, field):
+        child_field = field.field
+        if isinstance(child_field, IdentifierSymbol):
+            return child_field.lookup
+        elif isinstance(child_field, FieldAccessSymbol):
+            return self.get_target_fn_from_field(child_field)
+
+        raise NidavellirTypeError(
+            f"Cannot determine target function from field '{field.ast_node.target}'",
+            field.ast_node.line,
+        )
 
     def process_CallSymbol(self, sym):
+        is_field = False
+        if sym.field is not None:
+            is_field = True
+            self.process(sym.field)
+
         lk = sym.lookup
         if isinstance(lk, FunctionSymbol):
             self._process_FunctionSymbol(lk)
         else:
-            is_class, fn = self._get_function_from_target(lk)
+            is_in_class = False
+            if is_field:
+                is_in_class = True
+                is_class = False
+                fn = self.get_target_fn_from_field(sym.field)
+            else:
+                is_class, fn = self._get_function_from_target(lk)
+
             if not is_class:
-                self._check_args_counts(sym, fn)
+                self._check_args_counts(sym, fn, is_in_class)
 
                 calls = self._get_calls_from_value(lk)
                 for call in calls:
@@ -347,9 +384,9 @@ class AutoTypeDefEngine:
                     for arg in call.args:
                         arg_uses.append(arg)
 
-                    self._set_arg_uses(fn, arg_uses)
+                    self._set_arg_uses(fn, arg_uses, is_in_class)
 
-                self._set_arg_uses(fn, sym.args)
+                self._set_arg_uses(fn, sym.args, is_in_class)
 
                 fn.uses.extend(calls)
                 self._process_FunctionSymbol(fn)
@@ -405,7 +442,7 @@ class AutoTypeDefEngine:
     def process_ClassSymbol(self, sym):
         self.process_from_list(sym.body)
 
-        for method in sym.method_syms.values():
+        for method in sym.methods.values():
             self._process_FunctionSymbol(method)
 
     def process_SelfSymbol(self, sym):
@@ -417,44 +454,78 @@ class AutoTypeDefEngine:
         with TypeUpdate(sym):
             sym.type = ClassType(sym.class_name)
 
-    def process_FieldAccessSymbol(self, sym):
+    def resolve_field_target(self, sym):
         target = sym.target
+
         if target.type is None:
             self.process(target)
 
-        field = sym.chain
+        return target.type
 
-        if isinstance(target.type, ClassType):
-            class_sym = self._find_class(target.type.name)
-            if class_sym is None:
-                raise NidavellirTypeError(
-                    f"Class '{target.type.name}' not found", sym.ast_node.line
-                )
+    def lookup_class_field(self, class_type, field_name, line):
+        class_sym = self._find_class(class_type.name)
 
-            field_sym = class_sym.field_syms.get(field.name)
-            # raise Exception(class_sym)
-            if field_sym is None:
-                raise NidavellirTypeError(
-                    f"Field '{sym.ast_node.field.name}' not found in class '{target.type.name}'",
-                    sym.ast_node.line,
-                )
+        if class_sym is None:
+            raise NidavellirTypeError(
+                f"Class '{class_type.name}' not found",
+                line,
+            )
 
-            field.lookup = field_sym
-            field.field_name = field_sym.name
-            if field_sym.type is None:
-                self.process(field_sym)
+        field_sym = class_sym.fields.get(field_name)
+        if field_sym is None:
+            field_sym = class_sym.methods.get(field_name)
 
-            if field_sym.type is None:
-                raise NidavellirTypeError(
-                    f"Cannot determine type of field '{field.name}' in class '{target.type.name}'",
-                    sym.ast_node.line,
-                )
+        if field_sym is None:
+            raise NidavellirTypeError(
+                f"Field '{field_name}' not found in class '{class_type.name}'",
+                line,
+            )
 
-            with TypeUpdate(field):
-                field.type = field_sym.type
-                sym.type = field_sym.type
+        return field_sym
 
-        return
+    def resolve_field_type(self, field_sym, field_name, class_name, line):
+        if field_sym.type is None:
+            self.process(field_sym)
+
+        if field_sym.type is None:
+            raise NidavellirTypeError(
+                f"Cannot determine type of field '{field_name}' in class '{class_name}'",
+                line,
+            )
+
+        return field_sym.type
+
+    def update_field_access_type(self, sym, field, field_sym):
+        field.lookup = field_sym
+        field.resolve_name = field_sym.name
+
+        with TypeUpdate(field):
+            field.type = field_sym.type
+            sym.type = field_sym.type
+
+    def process_FieldAccessSymbol(self, sym):
+        target_type = self.resolve_field_target(sym)
+
+        if not isinstance(target_type, ClassType):
+            return
+
+        field = sym.field
+        line = sym.ast_node.line
+
+        field_sym = self.lookup_class_field(
+            target_type,
+            field.name,
+            line,
+        )
+
+        self.resolve_field_type(
+            field_sym,
+            field.name,
+            target_type.name,
+            line,
+        )
+
+        self.update_field_access_type(sym, field, field_sym)
 
     def _find_class(self, name):
         for sym in self.sym_tree:

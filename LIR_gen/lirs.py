@@ -268,3 +268,18 @@ class CastLIR:
         self.name = name
         self.target_type = target_type
         self.value = value
+
+
+class FieldRefLIR(LIR):
+    def __init__(self, name, target, field, type):
+        self.name = name
+        self.target = target
+        self.field = field
+        self.type = type
+
+
+class DeclareRefLIR(LIR):
+    def __init__(self, name, type, ref):
+        self.name = name
+        self.type = type
+        self.ref = ref

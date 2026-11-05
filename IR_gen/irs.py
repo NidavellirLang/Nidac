@@ -141,10 +141,12 @@ class VariableIR(IR):
 
 
 class CallIR(IR):
-    def __init__(self, target, args, type=None):
+    def __init__(self, target, args, type=None, field=None):
         self.target = target
         self.args = args
         self.type = type
+
+        self.field = field
 
         self.imported_func_call = False
 

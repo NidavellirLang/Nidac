@@ -97,16 +97,34 @@ class IRPasser:
         return ir
 
     def process_CallIR(self, ir, is_expr=False):
-        ir.args = [self.run_expr(arg) for arg in ir.args]
-        target = ir.target
+        if ir.field is not None:
+            field = ir.field
 
-        if target in self.generated_functions:
-            ir.target = self.generated_functions[target].name
+            if not isinstance(field, FieldAccessIR):
+                raise NidavellirInternalError(
+                    f"Expected FieldAccessIR, got {type(field).__name__}",
+                    ir.line,
+                )
+
+            receiver = self.run_expr(field.target)
+
+            ir.target = field.field
+            ir.args = [
+                receiver,
+                *(self.run_expr(arg) for arg in ir.args),
+            ]
+            ir.field = None
+
+        else:
+            ir.args = [self.run_expr(arg) for arg in ir.args]
+
+            if ir.target in self.generated_functions:
+                ir.target = self.generated_functions[ir.target].name
 
         if is_expr:
             return ir
-        else:
-            return [IR_Box(ir)]
+
+        return [IR_Box(ir)]
 
     def stmt_CallIR(self, ir):
         return self.process_CallIR(ir)

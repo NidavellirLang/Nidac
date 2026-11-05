@@ -1,36 +1,30 @@
 from type_systems.types import resolve_type, StringType, NoneType, ClassType, Type
-from dataclasses import dataclass, fields, field as dc_field
+
+# from dataclasses import dataclass, fields, field as dc_field
+from dataclasses import dataclass, fields as dc_fields, field as dc_field, is_dataclass
 from nida_ast.base import AST, IntrinsicAST
 
 
 @dataclass(slots=True, repr=False, kw_only=True)
 class Symbol:
+    type: Type | None = None
+    ast_node: AST | None = None
+    uses: list["Symbol"] = dc_field(default_factory=list)
 
-    # Class attributes with type hints
-    type: Type | None = None  # Type of the symbol, can be None
-    ast_node: AST | None = None  # Associated AST node, can be None
-    uses: list[Symbol] = dc_field(default_factory=list)  # List of symbol uses
-
-    # Formatting configuration constants
-    _FORMAT_SKIP = {"ast_node"}  # Attributes to skip during formatting
-    _FORMAT_MAX_ITEMS = 5  # Maximum number of items to show in collections
+    _FORMAT_SKIP = {"ast_node"}
+    _FORMAT_MAX_ITEMS = 5
     _FORMAT_MAX_DEPTH = 2
-    _FORMAT_MAX_VALUE_LEN = 100  # Maximum length of string representation
+    _FORMAT_MAX_VALUE_LEN = 100
 
     @staticmethod
     def _symbol_ref(value):
-
-        # Create a string representation of a symbol reference
         cls = type(value).__name__
-        # Get the class name of the value
-        # Try to get name or value attribute
+
         name = getattr(value, "name", None)
         if name is None:
             name = getattr(value, "value", None)
 
-        # Get the type of the symbol if available
         symbol_type = getattr(value, "type", None)
-        # Build parts of the reference string
 
         parts = [cls]
 
@@ -38,10 +32,8 @@ class Symbol:
             parts.append(repr(name))
 
         if symbol_type is not None:
-            type_name = type(symbol_type).__name__
-            parts.append(f"type={type_name}")
+            parts.append(f"type={type(symbol_type).__name__}")
 
-        # Add memory address for unique identification
         parts.append(f"@{id(value):x}")
 
         return f"<{' '.join(parts)}>"
@@ -74,7 +66,7 @@ class Symbol:
             suffix = f", ... +{count - len(items)}" if count > len(items) else ""
             return f"{{{', '.join(items)}{suffix}}}"
 
-        if hasattr(value, "__dict__"):
+        if is_dataclass(value) and not isinstance(value, type):
             cls_name = type(value).__name__
 
             name = getattr(value, "name", None)
@@ -128,9 +120,9 @@ class Symbol:
         seen.add(id(self))
 
         attrs = {
-            k: v
-            for k, v in vars(self).items()
-            if not k.startswith("_") and k not in self._FORMAT_SKIP
+            field.name: getattr(self, field.name)
+            for field in dc_fields(self)
+            if not field.name.startswith("_") and field.name not in self._FORMAT_SKIP
         }
 
         if not attrs:
@@ -161,9 +153,8 @@ class Symbol:
                 count = len(value)
 
                 if not count:
-                    lines.append(
-                        f"{field_prefix} {'[]' if isinstance(value, list) else '{}'}"
-                    )
+                    empty = "[]" if isinstance(value, list) else "{}"
+                    lines.append(f"{field_prefix} {empty}")
                     continue
 
                 if not verbose or indent >= max_depth:
@@ -174,7 +165,7 @@ class Symbol:
 
                 items = list(value.items()) if isinstance(value, dict) else value
 
-                for i, item in enumerate(items[:max_items]):
+                for item in items[:max_items]:
                     if isinstance(value, dict):
                         item_key, item_value = item
                     else:
@@ -268,6 +259,7 @@ class ReturnSymbol(Symbol):
 class CallSymbol(Symbol):
     name: str
     args: list[Symbol] = dc_field(default_factory=list)
+    field: FieldAccessSymbol | None = None
     lookup: Symbol | None = None
 
 
@@ -355,6 +347,12 @@ class BooleanSymbol(Symbol):
 
 @dataclass(slots=True, repr=False)
 class ClassSymbol(Symbol):
+    name: str
+    init_fn: FunctionSymbol | None = None
+    params: list[Symbol] = dc_field(default_factory=list)
+    body: list[Symbol] = dc_field(default_factory=list)
+    fields: dict[str, Symbol] = dc_field(default_factory=dict)
+    methods: dict[str, Symbol] = dc_field(default_factory=dict)
     pass
     # TODO: impl
     # def __init__(self, name, ast_node):
@@ -423,6 +421,9 @@ class MergeAssignmentSymbol(Symbol):
 
 @dataclass(slots=True, repr=False)
 class IdentifierSymbol(Symbol):
+    name: str
+    lookup: Symbol | None = None
+    resolve_name: str | None = None
     pass
     # TODO: impl
     # def __init__(self, name, ast_node):

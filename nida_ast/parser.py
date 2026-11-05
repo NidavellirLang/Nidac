@@ -839,7 +839,7 @@ class Parser:
 
         return CallAST(
             target=target_name,
-            chain=chain,
+            field=chain,
             args=args,
             line=line,
             node_id=self.id_alloc.alloc(),

@@ -121,7 +121,7 @@ class IndexAccessAST(AST):
 @dataclass(slots=True, repr=False)
 class CallAST(AST):
     target: str
-    chain: list
+    field: list
     args: list
 
 

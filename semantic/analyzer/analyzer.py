@@ -127,10 +127,9 @@ class SymbolTreeBuilder:
             ast_node=ast,
         )
 
-    # TODO: impl
-    # def eval_IdentifierAST(self, ast):
-    #     name = ast.name
-    #     return IdentifierSymbol(name, ast_node=ast)
+    def eval_IdentifierAST(self, ast):
+        name = ast.name
+        return IdentifierSymbol(name=name, ast_node=ast)
 
     def eval_UnaryOpAST(self, ast):
         right_sym = self.process_eval(ast.right)
@@ -153,6 +152,12 @@ class SymbolTreeBuilder:
         if isinstance(parent_assign, UnavailableSymbol):
             parent_assign = None
 
+        type = None
+        if parent_assign is not None:
+            type = parent_assign.type
+        else:
+            type = self.resolve(ast.type)
+
         assign_id = (
             parent_assign.ast_node.node_id if parent_assign is not None else ast.node_id
         )
@@ -164,12 +169,12 @@ class SymbolTreeBuilder:
             name=assign_name,
             value=val_sym,
             parent_assign=parent_assign,
-            type=ast.type,
+            type=type,
             ast_node=ast,
         )
 
         if final_sym.type is None:
-            final_sym.type = self.resolve(ast.type)
+            final_sym.type = type
 
         target_sym = parent_assign
 
@@ -275,47 +280,48 @@ class SymbolTreeBuilder:
 
         return params
 
-    def link_uses_from_class_call(self, call_args, init_fn, lookup):
-        for idx, ca in enumerate(call_args):
-            if isinstance(ca, SelfSymbol):
+    def link_uses_from_class_call(self, call_args, init_fn):
+        for idx, arg in enumerate(call_args):
+            if isinstance(arg, SelfSymbol):
                 continue
 
-            lookup_func_arg = init_fn.args[idx + 1]
-            if isinstance(lookup_func_arg, SelfSymbol):
+            init_arg = init_fn.args[idx + 1]
+
+            if isinstance(init_arg, SelfSymbol):
                 raise
 
-            lookup_func_arg.uses.append(ca)
+            init_arg.uses.append(arg)
 
     def _arg_symbols(self, lookup):
         if isinstance(lookup, ClassSymbol):
-            init_sym = lookup.method_syms.get("__init__")
+            init_fn = lookup.methods.get("__init__")
 
-            if init_sym is None:
+            if init_fn is None:
                 return []
 
-            return init_sym.args or []
+            return init_fn.args or []
 
         return getattr(lookup, "args", None) or []
 
-    # TODO: impl
     def process_intrinsic_call(self, ast):
         intrinsic = INTRINSICS[ast.target]
         name = intrinsic.name
-        args = self.process_call_args(ast.args, intrinsic, name, is_intrinsic=True)
 
-        return IntrinsicCallSymbol(
-            name=name, args=args, intrinsic=intrinsic, ast_node=ast
+        args = self.process_call_args(
+            ast.args,
+            intrinsic,
+            name,
+            is_intrinsic=True,
         )
 
-    def stmt_CallAST(self, ast):
-        func_name = ast.target
+        return IntrinsicCallSymbol(
+            name=name,
+            args=args,
+            intrinsic=intrinsic,
+            ast_node=ast,
+        )
 
-        if ast.chain:
-            raise NidavellirNotImplementedError("Chained calls", ast.line)
-
-        if TreeBuilderHelpers.check_intrinsic_call(func_name):
-            return self.process_intrinsic_call(ast)
-
+    def resolve_call_lookup(self, func_name, line):
         lookup = self.stm.lookup_func_name(func_name)
         is_class = False
         skip_arg_processing = False
@@ -331,32 +337,69 @@ class SymbolTreeBuilder:
         if lookup is None:
             raise NidavellirNameError(
                 f"Function '{func_name}' is not defined",
-                ast.line,
+                line,
             )
+
+        return lookup, is_class, skip_arg_processing
+
+    def process_call_arguments(self, ast, lookup, func_name, skip_arg_processing):
+        if not skip_arg_processing:
+            return self.process_call_args(ast.args, lookup, func_name)
 
         params = []
 
-        if skip_arg_processing:
-            for arg in ast.args:
-                params.append(self.process_eval(arg))
-        else:
-            params = self.process_call_args(ast.args, lookup, func_name)
+        for arg in ast.args:
+            params.append(self.process_eval(arg))
 
+        return params
+
+    def create_call_symbol(self, ast, lookup, func_name, params, field=None):
         sym = CallSymbol(
             name=func_name,
+            field=field,
             args=params,
             lookup=lookup,
             ast_node=ast,
         )
 
         lookup.uses.append(sym)
+        return sym
+
+    def link_class_call(self, call_sym, params, lookup):
+        init_fn = lookup.init_fn
+
+        if init_fn is None:
+            return
+
+        init_fn.uses.append(call_sym)
+        self.link_uses_from_class_call(params, init_fn)
+
+    def stmt_CallAST(self, ast):
+        func_name = ast.target
+        field = ast.field
+        field_sym = self.process_eval(field) if field is not None else None
+        # if ast.field:
+        #     raise NidavellirNotImplementedError("Chained calls", ast.line)
+
+        if TreeBuilderHelpers.check_intrinsic_call(func_name):
+            return self.process_intrinsic_call(ast)
+
+        lookup, is_class, skip_arg_processing = self.resolve_call_lookup(
+            func_name,
+            ast.line,
+        )
+
+        params = self.process_call_arguments(
+            ast,
+            lookup,
+            func_name,
+            skip_arg_processing,
+        )
+
+        sym = self.create_call_symbol(ast, lookup, func_name, params, field=field_sym)
 
         if is_class:
-            init_fn = lookup.init_fn
-
-            if init_fn is not None:
-                init_fn.uses.append(sym)
-                self.link_uses_from_class_call(params, init_fn, lookup)
+            self.link_class_call(sym, params, lookup)
 
         return sym
 
@@ -571,55 +614,59 @@ class SymbolTreeBuilder:
     #     self.st.extend(st)
 
     # TODO: impl
-    # def stmt_ClassAST(self, ast):
-    #     name = ast.name
-    #     id = self.get_id(ast)
 
-    #     class_sym = self.stm.lookup_class_name(name)
+    def stmt_ClassAST(self, ast):
+        name = ast.name
+        node_id = self.get_id(ast)
 
-    #     if class_sym is None:
-    #         class_sym = ClassSymbol(name, ast)
-    #         self.stm.define_class(name, id, class_sym)
+        class_sym = self.stm.lookup_class_name(name)
 
-    #     class_sym.ast_node = ast
+        if class_sym is None:
+            class_sym = ClassSymbol(name=name, ast_node=ast)
+            self.stm.define_class(name, node_id, class_sym)
 
-    #     self.stm.enter_scope()
-    #     self.current_class_name = name
+        class_sym.ast_node = ast
 
-    #     for b in ast.body:
-    #         res = self.process_stmt(b)
-    #         if res is not None:
-    #             class_sym.body.append(res)
+        self.stm.enter_scope()
+        self.current_class_name = name
 
-    #         if isinstance(b, AssignAST):
-    #             if b.field:
-    #                 raise NidavellirNotImplementedError("Not implemented", b.line)
-    #             else:
-    #                 class_sym.fields[b.target] = b
+        for node in ast.body:
+            symbol = self.process_stmt(node)
 
-    #             class_sym.field_syms[b.target] = res
-    #         elif isinstance(b, FunctionAST):
-    #             fn_res = res
-    #             if b.name == "__init__":
-    #                 class_sym.init_fn = fn_res
-    #                 params = []
-    #                 for p in b.args:
-    #                     if not isinstance(p, SelfAST):
-    #                         params.append(p)
+            if symbol is None:
+                continue
 
-    #                 class_sym.params = params
+            class_sym.body.append(symbol)
 
-    #             class_sym.methods[b.name] = b
-    #             class_sym.method_syms[b.name] = res
+            if isinstance(node, AssignAST):
+                if node.field:
+                    raise NidavellirNotImplementedError(
+                        "Not implemented",
+                        node.line,
+                    )
 
-    #             # for stmt in b.body:
-    #             #     if isinstance(stmt, AssignAST) and stmt.chain:
-    #             #         class_sym.fields.setdefault(stmt.chain[0], stmt)
+                class_sym.fields[node.target] = symbol
 
-    #     self.current_class_name = None
-    #     self.stm.exit_scope()
+            elif isinstance(node, FunctionAST):
+                self.register_class_method(class_sym, node, symbol)
 
-    #     return class_sym
+        self.current_class_name = None
+        self.stm.exit_scope()
+
+        return class_sym
+
+    def register_class_method(self, class_sym, ast, symbol):
+        class_sym.methods[ast.name] = symbol
+
+        if ast.name != "__init__":
+            return
+
+        class_sym.init_fn = symbol
+        class_sym.params = []
+
+        for param in ast.args:
+            if not isinstance(param, SelfAST):
+                class_sym.params.append(param)
 
     def eval_FieldAccessAST(self, ast):
         target = ast.target
