@@ -1,4 +1,4 @@
-from type_systems.types import resolve_type, StringType, NoneType, ClassType, Type
+from type_systems.types import Type
 
 # from dataclasses import dataclass, fields, field as dc_field
 from dataclasses import dataclass, fields as dc_fields, field as dc_field, is_dataclass
@@ -258,6 +258,7 @@ class ReturnSymbol(Symbol):
 @dataclass(slots=True, repr=False)
 class CallSymbol(Symbol):
     name: str
+    class_ref_type: Type | None = None
     args: list[Symbol] = dc_field(default_factory=list)
     field: FieldAccessSymbol | None = None
     lookup: Symbol | None = None

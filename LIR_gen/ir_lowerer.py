@@ -804,7 +804,7 @@ class IRLowerer:
         return str(type_val)
 
     def type_to_str(self, type_val):
-        if isinstance(type_val, FuncRefType):
+        if isinstance(type_val, RefType):
             return type_val
 
         if isinstance(type_val, Type):

@@ -283,25 +283,40 @@ class AutoTypeDefEngine:
         return calls
 
     # returned is_class and lk
-    def _get_function_from_target(self, target):
+    def _get_function_from_target(self, target, is_in_class=False):
+        if isinstance(target, FieldAccessSymbol):
+            return self._get_function_from_target(
+                target.field,
+                is_in_class=True,
+            )
+
+        if isinstance(target, IdentifierSymbol):
+            return self._get_function_from_target(
+                target.lookup,
+                is_in_class=is_in_class,
+            )
+
         if isinstance(target, FunctionSymbol):
-            return False, target
+            return False, is_in_class, target
+
         if isinstance(target, ClassSymbol):
-            return True, target
+            return True, is_in_class, target
 
         if isinstance(target, VariableSymbol):
-            lookup = target.lookup
-            if isinstance(lookup, FunctionSymbol):
-                return False, lookup
-            elif isinstance(lookup, ClassSymbol):
-                return True, lookup
-            else:
-                return self._get_function_from_target(lookup)
+            return self._get_function_from_target(
+                target.lookup,
+                is_in_class=is_in_class,
+            )
 
         if hasattr(target, "value"):
-            return self._get_function_from_target(target.value)
+            return self._get_function_from_target(
+                target.value,
+                is_in_class=is_in_class,
+            )
 
-        raise Exception(target, isinstance(target, VariableSymbol))
+        raise NidavellirInternalError(
+            f"Cannot resolve callable target: {target!r}",
+        )
 
     def _set_arg_uses(self, sym, uses: list, is_in_class=False):
         # raise Exception(sym)
@@ -358,22 +373,16 @@ class AutoTypeDefEngine:
         )
 
     def process_CallSymbol(self, sym):
-        is_field = False
         if sym.field is not None:
-            is_field = True
             self.process(sym.field)
-
+        print(sym.name)
+        # if sym.name == "n_name":
+        #     raise Exception(sym.lookup)
         lk = sym.lookup
         if isinstance(lk, FunctionSymbol):
             self._process_FunctionSymbol(lk)
         else:
-            is_in_class = False
-            if is_field:
-                is_in_class = True
-                is_class = False
-                fn = self.get_target_fn_from_field(sym.field)
-            else:
-                is_class, fn = self._get_function_from_target(lk)
+            is_class, is_in_class, fn = self._get_function_from_target(lk)
 
             if not is_class:
                 self._check_args_counts(sym, fn, is_in_class)
@@ -391,8 +400,13 @@ class AutoTypeDefEngine:
                 fn.uses.extend(calls)
                 self._process_FunctionSymbol(fn)
 
+                lk_type = sym.lookup.type
+                if isinstance(lk_type, ClassMethodRefType):
+                    sym.class_ref_type = lk_type
+
                 if sym.type is None:
                     sym.type = fn.type
+
             else:
                 req_params = fn.params
                 init_fn = fn.init_fn
@@ -462,7 +476,7 @@ class AutoTypeDefEngine:
 
         return target.type
 
-    def lookup_class_field(self, class_type, field_name, line):
+    def lookup_class_field(self, class_type, field_name, line, method=False):
         class_sym = self._find_class(class_type.name)
 
         if class_sym is None:
@@ -470,18 +484,15 @@ class AutoTypeDefEngine:
                 f"Class '{class_type.name}' not found",
                 line,
             )
-
-        field_sym = class_sym.fields.get(field_name)
-        if field_sym is None:
+        if not method:
+            field_sym = class_sym.fields.get(field_name)
+        else:
             field_sym = class_sym.methods.get(field_name)
 
-        if field_sym is None:
-            raise NidavellirTypeError(
-                f"Field '{field_name}' not found in class '{class_type.name}'",
-                line,
-            )
-
         return field_sym
+
+    def lookup_class_method(self, class_type, field_name, line):
+        return self.lookup_class_field(class_type, field_name, line, method=True)
 
     def resolve_field_type(self, field_sym, field_name, class_name, line):
         if field_sym.type is None:
@@ -495,28 +506,63 @@ class AutoTypeDefEngine:
 
         return field_sym.type
 
-    def update_field_access_type(self, sym, field, field_sym):
+    def resolve_target_var(self, sym):
+        if isinstance(sym, FieldAccessSymbol):
+            target = sym.target
+
+            if isinstance(target, VariableSymbol):
+                return target.lookup
+
+            if isinstance(target, FieldAccessSymbol):
+                return target
+
+        return None
+
+    def update_field_access_type(self, sym, field, field_sym, is_method):
         field.lookup = field_sym
         field.resolve_name = field_sym.name
 
+        type = field_sym.type
+
+        if is_method:
+            resolve = self.resolve_target_var(sym)
+            type = ClassMethodRefType(field_sym, resolve)
+
         with TypeUpdate(field):
-            field.type = field_sym.type
-            sym.type = field_sym.type
+            field.type = type
+            sym.type = type
 
     def process_FieldAccessSymbol(self, sym):
         target_type = self.resolve_field_target(sym)
 
         if not isinstance(target_type, ClassType):
-            return
+            raise NidavellirTypeError(
+                f"Cannot access field '{sym.field.name}' on non-class type '{target_type.name}'",
+                sym.ast_node.line,
+            )
 
         field = sym.field
         line = sym.ast_node.line
+        is_method = False
 
         field_sym = self.lookup_class_field(
             target_type,
             field.name,
             line,
         )
+        if field_sym is None:
+            field_sym = self.lookup_class_method(
+                target_type,
+                field.name,
+                line,
+            )
+            is_method = True
+
+        if field_sym is None:
+            raise NidavellirTypeError(
+                f"Field '{field.name}' not found in class '{target_type.name}'",
+                line,
+            )
 
         self.resolve_field_type(
             field_sym,
@@ -525,7 +571,7 @@ class AutoTypeDefEngine:
             line,
         )
 
-        self.update_field_access_type(sym, field, field_sym)
+        self.update_field_access_type(sym, field, field_sym, is_method)
 
     def _find_class(self, name):
         for sym in self.sym_tree:

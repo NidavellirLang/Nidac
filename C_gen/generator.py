@@ -3,7 +3,7 @@ from LIR_gen.lirs import *
 from .c_nodes import *
 from .c_types import *
 from .extra_c_includes import EXTRA_C_INCLUDES
-from type_systems.types import ClassType, FuncRefType
+from type_systems.types import ClassType, RefType
 
 
 class CExprTranslator:
@@ -61,7 +61,7 @@ class CTypeTranslator:
             if isinstance(type_name, str) and type_name.isidentifier():
                 return CTStruct(type_name)
 
-            if isinstance(type_name, FuncRefType):
+            if isinstance(type_name, RefType):
                 param_types, return_type = type_name.get_types()
 
                 param_c_types = [CTypeTranslator.translate(p) for p in param_types]

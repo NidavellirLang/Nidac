@@ -109,6 +109,22 @@ class IRGen:
         res = self.gen(value)
         return ReturnIR(res)
 
+    def gen_symbol_ref(self, sym):
+        if isinstance(sym, VariableSymbol):
+            return VariableIR(sym.lookup.name, sym.type)
+
+        if isinstance(sym, FieldAccessSymbol):
+            target = self.gen_symbol_ref(sym.target)
+            field = sym.field
+
+            return FieldAccessIR(
+                target,
+                field.lookup.name,
+                sym.type,
+            )
+
+        raise NidavellirInternalError(f"Cannot generate symbol reference: {sym!r}")
+
     def gen_CallAST(self, ast):
         lk = self.get_lk(ast)
         if isinstance(lk, IntrinsicCallSymbol):
@@ -123,6 +139,12 @@ class IRGen:
         args_irs = []
         for arg in args:
             args_irs.append(self.gen(arg))
+
+        ref_type = lk.class_ref_type
+
+        if ref_type is not None:
+            self_ir = self.gen_symbol_ref(ref_type.instance_lk)
+            args_irs.insert(0, self_ir)
 
         ir = CallIR(target, args_irs, type, field_ir)
         return ir

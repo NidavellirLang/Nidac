@@ -96,26 +96,31 @@ class IRPasser:
     def default_expr_pass(self, ir):
         return ir
 
+    def _resolve_method_reference(self, ir):
+        if ir.field is None:
+            return False
+
+        field = ir.field
+
+        if not isinstance(field, FieldAccessIR):
+            raise NidavellirInternalError(
+                f"Expected FieldAccessIR, got {type(field).__name__}",
+                ir.line,
+            )
+
+        receiver = self.run_expr(field.target)
+
+        ir.target = field.field
+        ir.args = [
+            receiver,
+            *(self.run_expr(arg) for arg in ir.args),
+        ]
+        ir.field = None
+
+        return True
+
     def process_CallIR(self, ir, is_expr=False):
-        if ir.field is not None:
-            field = ir.field
-
-            if not isinstance(field, FieldAccessIR):
-                raise NidavellirInternalError(
-                    f"Expected FieldAccessIR, got {type(field).__name__}",
-                    ir.line,
-                )
-
-            receiver = self.run_expr(field.target)
-
-            ir.target = field.field
-            ir.args = [
-                receiver,
-                *(self.run_expr(arg) for arg in ir.args),
-            ]
-            ir.field = None
-
-        else:
+        if not self._resolve_method_reference(ir):
             ir.args = [self.run_expr(arg) for arg in ir.args]
 
             if ir.target in self.generated_functions:
@@ -133,7 +138,19 @@ class IRPasser:
         return self.process_CallIR(ir, is_expr=True)
 
     def stmt_AssignIR(self, ir):
-        ir.value = self.run_expr(ir.value)
+        value = ir.value
+
+        if isinstance(value, FieldAccessIR) and isinstance(value.type, RefType):
+            field = value
+
+            ir.value = VariableIR(field.field)
+            ir.value.type = field.type
+
+            ir.value.receiver = self.run_expr(field.target)
+
+        else:
+            ir.value = self.run_expr(value)
+
         return [IR_Box(ir)]
 
     def stmt_DefinitionIR(self, ir):

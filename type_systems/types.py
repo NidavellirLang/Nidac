@@ -238,7 +238,7 @@ class ClassType(Type):
         return self.name
 
 
-class FuncRefType(Type):
+class RefType(Type):
     def __init__(self, lk):
         self.lk = lk
 
@@ -259,6 +259,22 @@ class FuncRefType(Type):
 
     def __str__(self):
         param_types, return_type = self.get_types()
-
         params = ", ".join(map(str, param_types))
-        return f"FuncRef[({params}) -> {return_type}]"
+        return f"{self.__class__.__name__.removesuffix('Type')}[({params}) -> {return_type}]"
+
+
+class FuncRefType(RefType):
+    def __init__(self, lk):
+        super().__init__(lk)
+
+
+class ClassMethodRefType(RefType):
+    def __init__(self, lk, instance_lk):
+        super().__init__(lk)
+        self.instance_lk = instance_lk
+
+    def get_self_instance(self):
+        if self.instance_lk is None:
+            raise
+
+        return self.instance_lk.name
