@@ -202,6 +202,7 @@ class IRGen:
         name = lk.name
         type = lk.type
         if type is None:
+            raise Exception(lk.lookup.ast_node)
             raise NidavellirInternalError(f"No type for VariableAST")
 
         return VariableIR(name, type)
@@ -225,8 +226,8 @@ class IRGen:
         type = lk.type
 
         is_called = lk.is_called
-        if not is_called:
-            return None
+        # if not is_called:
+        #     return None
 
         decs = ast.decorators
         args = ast.args

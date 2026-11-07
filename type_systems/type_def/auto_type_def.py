@@ -305,7 +305,8 @@ class AutoTypeDefEngine:
 
                 offset += 1
                 continue  # Skip SelfSymbol
-
+            if (idx - offset) >= len(uses):
+                raise Exception(uses)
             arg.uses.append(uses[idx - offset])
 
     def _check_args_counts(self, sym, fn_sym, is_in_class=False):
@@ -378,6 +379,12 @@ class AutoTypeDefEngine:
                 is_in_class=is_in_class,
             )
 
+        if isinstance(target, CallSymbol):
+            return self._get_function_from_target(
+                target.lookup,
+                is_in_class=is_in_class,
+            )
+
         if hasattr(target, "value"):
             return self._get_function_from_target(
                 target.value,
@@ -389,11 +396,10 @@ class AutoTypeDefEngine:
         )
 
     def process_CallSymbol(self, sym):
+        lookup = sym.lookup
         if sym.field is not None:
             self.process(sym.field)
-
-        lookup = sym.lookup
-        target = sym.field if sym.field is not None else lookup
+        target = sym.field if sym.field is not None else sym.lookup
 
         if isinstance(target, FunctionSymbol):
             fn = target
@@ -406,15 +412,26 @@ class AutoTypeDefEngine:
         if not is_class:
             self._check_args_counts(sym, fn, is_in_class)
 
-            calls = self._get_calls_from_value(lookup)
+            calls = self._get_calls_from_value(sym)
 
             for call in calls:
-                self._set_arg_uses(fn, call.args, is_in_class)
+                try:
+                    self._set_arg_uses(fn, call.args, is_in_class)
+                except:
+                    raise Exception(fn.ast_node)
 
             self._set_arg_uses(fn, sym.args, is_in_class)
 
             fn.uses.extend(calls)
+            # if sym not in fn.uses:
+            #     fn.uses.append(sym)
+
             self._process_FunctionSymbol(fn)
+            if sym.field is not None:
+                self.process(sym.field)
+
+            # if sym.name != "Namer":
+            #     raise Exception(fn.args)
 
             if isinstance(target.type, ClassMethodRefType):
                 sym.class_ref_type = target.type
@@ -425,6 +442,9 @@ class AutoTypeDefEngine:
         else:
             req_params = fn.params
             init_fn = fn.init_fn
+            if init_fn is not None:
+                self._process_FunctionSymbol(init_fn)
+
             if init_fn is None and sym.args:
                 raise NidavellirTypeError(
                     f"Cannot call constructor of class '{fn.name}' with arguments",
@@ -470,9 +490,7 @@ class AutoTypeDefEngine:
 
     def process_ClassSymbol(self, sym):
         self.process_from_list(sym.body)
-
-        for method in sym.methods.values():
-            self._process_FunctionSymbol(method)
+        # self._process_FunctionSymbol(sym.init_fn)
 
     def process_SelfSymbol(self, sym):
         if sym.class_name is None:
@@ -513,11 +531,11 @@ class AutoTypeDefEngine:
         if field_sym.type is None:
             self.process(field_sym)
 
-        if field_sym.type is None:
-            raise NidavellirTypeError(
-                f"Cannot determine type of field '{field_name}' in class '{class_name}'",
-                line,
-            )
+        # if field_sym.type is None:
+        #     raise NidavellirTypeError(
+        #         f"Cannot determine type of field '{field_name}' in class '{class_name}'",
+        #         line,
+        #     )
 
         return field_sym.type
 

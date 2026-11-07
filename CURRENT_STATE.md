@@ -3,15 +3,21 @@
 ## Active Work
 Refactoring the Symbol system and type definitions.
 
+## Verified Functionality
+- Class construction and instance initialization.
+- Direct class method calls, including methods with arguments.
+- Bound method references and invocation through aliases.
+- Nested instance field access and method references.
+- Preserving the correct instance (`self`) across stored method references.
+- Reading updated instance fields through previously stored method references.
+- Nested method calls and method forwarding between class instances.
+
 ## Known Issues
 - Some AST visitors in the analyzer still use outdated Symbol constructors.
 - SymbolTable compatibility has not yet been verified.
-- Type inference for class methods that accept arguments is currently incorrect.
-- Nested class-method calls fail to resolve the receiver's `self` correctly. For example, `self.nm.print_name()` raises `Function 'self' is not defined` in `resolve_call_lookup`.
 
 ## Next Steps
-- Refactor remaining AST visitors.
-- Verify SymbolTable compatibility.
-- Fix type inference for class methods with arguments.
-- Fix `self` resolution in nested/chained class-method calls.
-- Run semantic analyzer regression tests.
+- Refactor remaining AST visitors to use the updated Symbol constructors.
+- Verify SymbolTable compatibility with the refactored Symbol system.
+- Expand semantic analyzer regression tests, especially around class methods, bound method references, nested field access, and instance mutation.
+- Continue validating edge cases in class and method handling before moving on to further compiler optimizations.
