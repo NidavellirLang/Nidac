@@ -153,11 +153,11 @@ class IRGen:
         ref_type = lk.class_ref_type
 
         if ref_type is not None:
-            self_ir = self.gen_symbol_ref(ref_type.instance_lk)
-            # try:
-            #     self_ir = self.gen_symbol_ref(ref_type.instance_lk)
-            # except:
-            #     raise Exception(ref_type.instance_lk)
+            # self_ir = self.gen_symbol_ref(ref_type.instance_lk)
+            try:
+                self_ir = self.gen_symbol_ref(ref_type.instance_lk)
+            except:
+                raise Exception(ast)
             args_irs.insert(0, self_ir)
 
         ir = CallIR(target, args_irs, type, field_ir)
@@ -202,8 +202,15 @@ class IRGen:
         name = lk.name
         type = lk.type
         if type is None:
-            raise Exception(lk.lookup.ast_node)
-            raise NidavellirInternalError(f"No type for VariableAST")
+            if (
+                hasattr(lk, "lookup")
+                and lk.lookup is not None
+                and lk.lookup.type is not None
+            ):
+                type = lk.lookup.type
+            else:
+                raise Exception(lk)
+                raise NidavellirInternalError(f"No type for VariableAST")
 
         return VariableIR(name, type)
 

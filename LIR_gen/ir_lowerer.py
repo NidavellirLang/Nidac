@@ -299,7 +299,10 @@ class IRLowerer:
         name = hir.name
         args = hir.args
         is_static = hir.is_static
-        type_str = self.str_of(hir)
+        try:
+            type_str = self.str_of(hir)
+        except:
+            raise Exception(hir)
         body = hir.body
 
         prev_blocks = self.blocks

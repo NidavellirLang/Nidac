@@ -70,6 +70,12 @@ class Type:
     def __str__(self):
         return self.__class__.__name__
 
+    def __eq__(self, other):
+        if not isinstance(other, Type):
+            return NotImplemented
+
+        return str(self) == str(other)
+
 
 class NumberType(Type):
     pass

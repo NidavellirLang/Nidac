@@ -176,6 +176,12 @@ class SysArgsClass:
             help="Log symbol attribute assignments",
         )
 
+        parser.add_argument(
+            "--log-uses-appends",
+            action="store_true",
+            help="Log symbol attribute assignments",
+        )
+
         parsed, _ = parser.parse_known_args(args)
 
         temp_dir = Path(tempfile.gettempdir())

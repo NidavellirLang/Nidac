@@ -366,8 +366,8 @@ class SymbolTreeBuilder:
             lookup=lookup,
             ast_node=ast,
         )
-
-        lookup.uses.append(sym)
+        if isinstance(lookup, FunctionSymbol):
+            lookup.uses.append(sym)
         return sym
 
     def link_class_call(self, call_sym, params, lookup):

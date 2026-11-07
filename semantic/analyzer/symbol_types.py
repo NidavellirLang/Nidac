@@ -7,11 +7,46 @@ from dataclasses import dataclass, fields as dc_fields, field as dc_field, is_da
 from nida_ast.base import AST, IntrinsicAST
 
 
+class TrackedList(list):
+    def _log(self, operation, *args):
+        print(
+            f"\n[USES {operation}]"
+            f"\n  OWNER: {getattr(self, 'owner', None)!r}"
+            f"\n  ARGS: {args!r}",
+            flush=True,
+        )
+        traceback.print_stack()
+
+    def append(self, item):
+        self._log("APPEND", item)
+        super().append(item)
+
+    def extend(self, items):
+        items = list(items)
+        self._log("EXTEND", items)
+        super().extend(items)
+
+    def insert(self, index, item):
+        self._log("INSERT", index, item)
+        super().insert(index, item)
+
+    def __iadd__(self, items):
+        self._log("IADD", items)
+        return super().__iadd__(items)
+
+    def __setitem__(self, key, value):
+        self._log("SETITEM", key, value)
+        super().__setitem__(key, value)
+
+
 @dataclass(slots=True, repr=False, kw_only=True)
 class Symbol:
     type: Type | None = None
     ast_node: AST | None = None
-    uses: list["Symbol"] = dc_field(default_factory=list)
+    if SysArgs.log_uses_appends:
+        uses: list["Symbol"] = dc_field(default_factory=TrackedList)
+    else:
+        uses: list["Symbol"] = dc_field(default_factory=list)
 
     _FORMAT_SKIP = {"ast_node"}
     _FORMAT_MAX_ITEMS = 5

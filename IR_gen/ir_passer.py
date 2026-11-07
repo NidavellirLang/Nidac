@@ -134,6 +134,10 @@ class IRPasser:
     def expr_CallIR(self, ir):
         return self.process_CallIR(ir, is_expr=True)
 
+    def stmt_BlockIR(self, ir):
+        ir.body = self.run_stmts(ir.body)
+        return [IR_Box(ir)]
+
     def stmt_AssignIR(self, ir):
         value = ir.value
 

@@ -57,7 +57,7 @@ class CTypeTranslator:
 
         try:
             return cls.TYPES[type_name]
-        except KeyError:
+        except Exception:
             if isinstance(type_name, str) and type_name.isidentifier():
                 return CTStruct(type_name)
 

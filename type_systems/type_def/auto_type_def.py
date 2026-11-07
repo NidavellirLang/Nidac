@@ -93,12 +93,20 @@ class AutoTypeDefEngine:
                             f"Cannot determine type of assigned value {sym}",
                             sym.ast_node.line,
                         )
-
         elif sym.uses:
-            inferred_types = []
-            last_type = None
+            deferred = []
+            inferred_type = None
 
             for use in sym.uses:
+                if (
+                    isinstance(use, CallSymbol)
+                    and use.field is not None
+                    and isinstance(use.field.target, VariableSymbol)
+                    and use.field.target.lookup is sym
+                ):
+                    deferred.append(use)
+                    continue
+
                 if use.type is None:
                     self.process(use)
 
@@ -108,24 +116,41 @@ class AutoTypeDefEngine:
                         sym.ast_node.line,
                     )
 
-                if last_type is not None and type(last_type) != type(use.type):
+                if inferred_type is not None and inferred_type != use.type:
                     raise NidavellirTypeError(
                         f"Cannot determine type of assigned value, "
-                        f"{last_type} -> {use.type}",
+                        f"{inferred_type} -> {use.type}",
                         sym.ast_node.line,
                     )
 
-                last_type = use.type
-                inferred_types.append(use.type)
+                inferred_type = use.type
 
-            if inferred_types and last_type:
+            if inferred_type is not None:
                 with TypeUpdate(sym):
-                    sym.type = last_type
-            else:
+                    sym.type = inferred_type
+
+            elif deferred:
                 raise NidavellirTypeError(
-                    "Cannot determine type of assigned value",
+                    "Cannot infer type from circular assignment dependency",
                     sym.ast_node.line,
                 )
+
+            for use in deferred:
+                if use.type is None:
+                    self.process(use)
+
+                if use.type is None:
+                    raise NidavellirTypeError(
+                        "Cannot determine type of assigned value",
+                        sym.ast_node.line,
+                    )
+
+                if sym.type != use.type:
+                    raise NidavellirTypeError(
+                        f"Cannot determine type of assigned value, "
+                        f"{sym.type} -> {use.type}",
+                        sym.ast_node.line,
+                    )
 
     def process_DefinitionSymbol(self, sym):
         if sym.type is None:
@@ -396,9 +421,9 @@ class AutoTypeDefEngine:
         )
 
     def process_CallSymbol(self, sym):
-        lookup = sym.lookup
         if sym.field is not None:
             self.process(sym.field)
+
         target = sym.field if sym.field is not None else sym.lookup
 
         if isinstance(target, FunctionSymbol):
@@ -425,7 +450,6 @@ class AutoTypeDefEngine:
             fn.uses.extend(calls)
             # if sym not in fn.uses:
             #     fn.uses.append(sym)
-
             self._process_FunctionSymbol(fn)
             if sym.field is not None:
                 self.process(sym.field)
@@ -503,7 +527,6 @@ class AutoTypeDefEngine:
 
     def resolve_field_target(self, sym):
         target = sym.target
-
         if target.type is None:
             self.process(target)
 
