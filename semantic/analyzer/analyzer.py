@@ -400,7 +400,7 @@ class SymbolTreeBuilder:
 
         if is_class:
             self.link_class_call(sym, params, lookup)
-
+        # raise Exception(ast)
         return sym
 
     # TODO: impl

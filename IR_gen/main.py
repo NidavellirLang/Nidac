@@ -111,7 +111,10 @@ class IRGen:
 
     def gen_symbol_ref(self, sym):
         if isinstance(sym, VariableSymbol):
-            return VariableIR(sym.lookup.name, sym.type)
+            return self.gen_symbol_ref(sym.lookup)
+
+        if isinstance(sym, AssignSymbol):
+            return VariableIR(sym.name, sym.type)
 
         if isinstance(sym, FieldAccessSymbol):
             target = self.gen_symbol_ref(sym.target)
@@ -147,6 +150,8 @@ class IRGen:
             args_irs.insert(0, self_ir)
 
         ir = CallIR(target, args_irs, type, field_ir)
+        if target == "Nida_Annon_38":
+            raise Exception(ast.args)
         return ir
 
     def gen_IntrinsicCallAST(self, ast):

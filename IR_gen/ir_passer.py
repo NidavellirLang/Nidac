@@ -108,11 +108,8 @@ class IRPasser:
                 ir.line,
             )
 
-        receiver = self.run_expr(field.target)
-
         ir.target = field.field
         ir.args = [
-            receiver,
             *(self.run_expr(arg) for arg in ir.args),
         ]
         ir.field = None
@@ -277,6 +274,7 @@ class IRPasser:
         )
 
     def _field_setter(self, class_type, field_name, field_type, default_value):
+        raise
         if default_value is None:
             if not isinstance(field_type, ClassType):
                 return None

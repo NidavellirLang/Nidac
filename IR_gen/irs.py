@@ -287,3 +287,8 @@ class ListLiteralIR(IR):
 class IdentifierIR(IR):
     def __init__(self, name):
         self.name = name
+
+
+class SelfBoxIR(IR):
+    def __init__(self, ir):
+        self.ir = ir
