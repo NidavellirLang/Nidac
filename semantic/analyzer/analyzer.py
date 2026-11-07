@@ -232,6 +232,11 @@ class SymbolTreeBuilder:
             if res is not None:
                 params.append(res)
 
+            if isinstance(res, SelfSymbol):
+                ast_node = res.ast_node
+                id = self.get_id(ast_node)
+                self.stm.define_assignment("self", id, res)
+
         fn_sym.args = params
 
         fn_sym.body = self.process_from_list(ast.body)
@@ -336,7 +341,7 @@ class SymbolTreeBuilder:
 
         if lookup is None:
             raise NidavellirNameError(
-                f"Function '{func_name}' is not defined",
+                f"'{func_name}' is not defined",
                 line,
             )
 

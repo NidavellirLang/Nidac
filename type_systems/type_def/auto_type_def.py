@@ -65,6 +65,18 @@ class AutoTypeDefEngine:
         sym.type = StringType()
 
     def process_AssignSymbol(self, sym):
+        if sym.field is not None:
+            self.process(sym.field)
+
+            if sym.field.type is None:
+                raise NidavellirTypeError(
+                    "Cannot determine type of assignment target",
+                    sym.ast_node.line,
+                )
+
+            with TypeUpdate(sym):
+                sym.type = sym.field.type
+
         if sym.value is not None:
             if sym.type is not None:
                 with TypeUpdate(sym.value):
@@ -74,45 +86,46 @@ class AutoTypeDefEngine:
 
             if sym.type is None:
                 with TypeUpdate(sym):
-                    types = sym.value.type
-                    sym.type = types
+                    sym.type = sym.value.type
+
                     if sym.type is None:
                         raise NidavellirTypeError(
                             f"Cannot determine type of assigned value {sym}",
                             sym.ast_node.line,
                         )
+
         elif sym.uses:
-            infered_types = []
+            inferred_types = []
             last_type = None
+
             for use in sym.uses:
                 if use.type is None:
                     self.process(use)
 
                 if use.type is None:
                     raise NidavellirTypeError(
-                        "Cannot determine type of assigned value", sym.ast_node.line
+                        "Cannot determine type of assigned value",
+                        sym.ast_node.line,
                     )
 
                 if last_type is not None and type(last_type) != type(use.type):
                     raise NidavellirTypeError(
-                        f"Cannot determine type of assigned value, {last_type} -> {use.type}",
+                        f"Cannot determine type of assigned value, "
+                        f"{last_type} -> {use.type}",
                         sym.ast_node.line,
                     )
 
                 last_type = use.type
+                inferred_types.append(use.type)
 
-                infered_types.append(use.type)
-
-            if infered_types and last_type:
-                sym.type = last_type
-
+            if inferred_types and last_type:
+                with TypeUpdate(sym):
+                    sym.type = last_type
             else:
                 raise NidavellirTypeError(
-                    "Cannot determine type of assigned value", sym.ast_node.line
+                    "Cannot determine type of assigned value",
+                    sym.ast_node.line,
                 )
-
-        if sym.field:
-            self.process(sym.field)
 
     def process_DefinitionSymbol(self, sym):
         if sym.type is None:
@@ -287,8 +300,12 @@ class AutoTypeDefEngine:
         offset = 0
         for idx, arg in enumerate(sym.args):
             if is_in_class and idx == 0:
+                if not isinstance(arg, SelfSymbol):
+                    raise
+
                 offset += 1
                 continue  # Skip SelfSymbol
+
             arg.uses.append(uses[idx - offset])
 
     def _check_args_counts(self, sym, fn_sym, is_in_class=False):

@@ -20,6 +20,9 @@ class Line:
         self.col_start = col_start
         self.col_end = col_end
 
+    def __repr__(self):
+        return f"Line({self.line}, {self.col_start}, {self.col_end})"
+
 
 RED = "\033[31m"
 BRIGHT_RED = "\033[91m"

@@ -1,4 +1,6 @@
 from type_systems.types import Type
+from utils import SysArgs
+import traceback
 
 # from dataclasses import dataclass, fields, field as dc_field
 from dataclasses import dataclass, fields as dc_fields, field as dc_field, is_dataclass
@@ -15,6 +17,26 @@ class Symbol:
     _FORMAT_MAX_ITEMS = 5
     _FORMAT_MAX_DEPTH = 2
     _FORMAT_MAX_VALUE_LEN = 100
+
+    def __setattr__(self, name, value):
+
+        if name in SysArgs.log_set_sym_attr:
+            try:
+                old_value = object.__getattribute__(self, name)
+            except AttributeError:
+                old_value = "<UNSET>"
+
+            print(
+                f"\n[SYM ATTR WRITE] {type(self).__name__}.{name}"
+                f"\n  SYMBOL: {getattr(self, 'name', '<UNSET>')}"
+                f"\n  OLD: {old_value!r}"
+                f"\n  NEW: {value!r}",
+                flush=True,
+            )
+
+            traceback.print_stack()
+
+        object.__setattr__(self, name, value)
 
     @staticmethod
     def _symbol_ref(value):
@@ -385,6 +407,7 @@ class FieldAccessSymbol(Symbol):
 @dataclass(slots=True, repr=False)
 class SelfSymbol(Symbol):
     class_name: str | None = None
+    name: str = "self"
 
 
 @dataclass(slots=True, repr=False)

@@ -1,7 +1,7 @@
 class IR:
     def tree_repr(self, indent="", is_last=True):
         if self.__class__.__name__ == "VariableIR":
-            return f"{indent}{'└── ' if is_last else '├── '}VariableIR({repr(getattr(self, 'name', ''))})"
+            return f"{indent}{'└── ' if is_last else '├── '}VariableIR({repr(getattr(self, 'name', ''))}, {repr(getattr(self, 'type', ''))})"
         if self.__class__.__name__ == "NumberIR":
             return f"{indent}{'└── ' if is_last else '├── '}NumberIR({repr(getattr(self, 'value', ''))})"
 

@@ -168,6 +168,14 @@ class SysArgsClass:
             help="Enable verbose output",
         )
 
+        parser.add_argument(
+            "--log-set-sym-attr",
+            nargs="+",
+            default=[],
+            metavar="ATTR",
+            help="Log symbol attribute assignments",
+        )
+
         parsed, _ = parser.parse_known_args(args)
 
         temp_dir = Path(tempfile.gettempdir())

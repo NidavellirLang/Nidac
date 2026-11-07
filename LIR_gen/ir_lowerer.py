@@ -152,7 +152,7 @@ class IRLowerer:
         try:
             type_str = self.str_of(hir)
         except:
-            raise Exception()
+            raise Exception(hir.type)
 
         const_id = self.get_value_id()
         lirs = LIRs()

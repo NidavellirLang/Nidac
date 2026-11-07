@@ -111,6 +111,13 @@ class IRGen:
 
     def gen_symbol_ref(self, sym):
         if isinstance(sym, VariableSymbol):
+            if sym.name == "self":
+                lookup = sym.lookup
+                class_name = lookup.name
+                # raise Exception(class_name)
+                class_ref_type = ClassType(class_name)
+                return VariableIR(sym.name, class_ref_type)
+
             return self.gen_symbol_ref(sym.lookup)
 
         if isinstance(sym, AssignSymbol):
@@ -147,6 +154,10 @@ class IRGen:
 
         if ref_type is not None:
             self_ir = self.gen_symbol_ref(ref_type.instance_lk)
+            # try:
+            #     self_ir = self.gen_symbol_ref(ref_type.instance_lk)
+            # except:
+            #     raise Exception(ref_type.instance_lk)
             args_irs.insert(0, self_ir)
 
         ir = CallIR(target, args_irs, type, field_ir)
