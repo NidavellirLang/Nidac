@@ -146,7 +146,7 @@ class SymbolTreeBuilder:
 
     #     return ListLiteralSymbol(elements, ast_node=ast)
 
-    def stmt_AssignAST(self, ast):
+    def stmt_AssignAST(self, ast, is_class_field=False):
         target = ast.target
         parent_assign = self.stm.lookup_assignment_name(target)
         if isinstance(parent_assign, UnavailableSymbol):
@@ -182,7 +182,10 @@ class SymbolTreeBuilder:
             final_sym.parent_assign = target_sym
             target_sym.uses.append(final_sym)
         elif target != "self":
-            self.stm.define_assignment(target, ast.node_id, final_sym)
+            if is_class_field:
+                self.stm.define_assignment_id(ast.node_id, final_sym)
+            else:
+                self.stm.define_assignment(target, ast.node_id, final_sym)
 
         field = ast.field
         field_sym = self.process_eval(field) if field is not None else None
@@ -636,7 +639,10 @@ class SymbolTreeBuilder:
         self.current_class_name = name
 
         for node in ast.body:
-            symbol = self.process_stmt(node)
+            if isinstance(node, AssignAST):
+                symbol = self.stmt_AssignAST(node, is_class_field=True)
+            else:
+                symbol = self.process_stmt(node)
 
             if symbol is None:
                 continue

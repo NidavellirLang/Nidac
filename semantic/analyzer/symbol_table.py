@@ -153,6 +153,10 @@ class SymbolTableManager:
         self.current_scope.define_assignment(name, symbol)
         return symbol
 
+    def define_assignment_id(self, symbol_id, symbol):
+        self.global_scope.define_symbol_id(symbol_id, symbol)
+        return symbol
+
     def define_assignment(self, name, symbol_id, symbol):
         self.current_scope.define_assignment(name, symbol)
         self.global_scope.define_symbol_id(symbol_id, symbol)

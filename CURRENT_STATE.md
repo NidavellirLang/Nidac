@@ -1,19 +1,35 @@
 # Current State
 
 ## Active Work
-Refactoring the Symbol system and type definitions.
+Completing class and method semantics, particularly nested method references and bound method resolution.
 
 ## Known Issues
-- Class constructor argument count errors can cause Python `IndexError` instead of a proper Nidavellir error.
-- Class fields declared at class scope can incorrectly appear accessible inside methods without `self` (e.g. `name = "Nidavellir"`).
-- Instance field access through `self` is not resolved correctly inside methods (e.g. `print(self.name)` fails).
-- Some AST visitors in the analyzer still use outdated Symbol constructors.
-- SymbolTable compatibility has not yet been verified.
+- Nested method references are not yet supported correctly. For example:
+  ```python
+  set_nested = p1.get_namer().set_name
+  get_nested = p1.get_namer().get_name
+
+  set_nested("Nested Mutation")
+  print(get_nested())
+  ```
+  The receiver returned by a method call must be resolved correctly when accessing and referencing its methods.
+
+## Working Features
+- Class declarations and instance field access through `self`.
+- Constructor initialization and argument handling.
+- Bound method references and aliases.
+- Multiple references to the same method with different receivers.
+- Instance mutations through original and aliased method references.
+- Nested object references and mutations.
+- Cross-instance method calls and object interactions.
+- Method forwarding and reference preservation.
+- Team-style object composition and mutations across multiple instances.
+
+The comprehensive `Namer`, `Player`, and `Team` test program compiles and executes successfully, except for the nested method reference cases currently commented out.
 
 ## Next Steps
-- Fix constructor argument count validation.
-- Fix class field name resolution inside methods.
-- Refactor remaining AST visitors to use updated Symbol constructors.
-- Verify SymbolTable compatibility.
-- Expand semantic analyzer regression tests.
-- Complete class and method semantics before moving on to compiler optimizations.
+- Fix nested method reference resolution, especially method access on the result of a method call.
+- Enable and verify the nested method reference tests.
+- Expand class and method semantic regression tests.
+- Continue completing the remaining language features and validating their correctness.
+- Defer compiler optimizations until the language semantics and core features are stable.

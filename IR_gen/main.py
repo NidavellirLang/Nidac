@@ -233,8 +233,8 @@ class IRGen:
         type = lk.type
 
         is_called = lk.is_called
-        # if not is_called:
-        #     return None
+        if not is_called:
+            return None
 
         decs = ast.decorators
         args = ast.args
@@ -403,6 +403,7 @@ class IRGen:
             elif isinstance(n, FunctionAST):
                 res = self.gen(n)
                 if res is None:
+                    continue
                     raise Exception(f"No IR generated for {n}")
 
                 new_body.append(res)
