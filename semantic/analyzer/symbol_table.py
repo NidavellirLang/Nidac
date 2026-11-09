@@ -1,6 +1,7 @@
 from .symbol_types import *
 from nida_ast.base import *
 from utils.errors import *
+from utils.hashability import ishashable
 
 
 class SymbolRegistry:
@@ -76,6 +77,9 @@ class Scope:
     def _lookup_name(self, name, category):
         scope = self
         while scope is not None:
+            if not ishashable(name):
+                return None
+
             symbol = getattr(scope.registry, category).get(name)
             if symbol is not None:
                 return symbol

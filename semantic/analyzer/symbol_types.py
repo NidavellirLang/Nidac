@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from type_systems.types import Type
 from utils import SysArgs
 import traceback

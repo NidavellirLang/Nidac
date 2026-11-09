@@ -4,12 +4,16 @@ from .symbol_types import *
 from nida_ast.base import *
 from type_systems.types import *
 from utils.errors import *
+from utils.hashability import ishashable
 from ..intrinsics import INTRINSICS
 
 
 class TreeBuilderHelpers:
     @classmethod
     def check_intrinsic_call(cls, name):
+        if not ishashable(name):
+            return None
+
         return name in INTRINSICS
 
 
@@ -384,18 +388,31 @@ class SymbolTreeBuilder:
 
     def stmt_CallAST(self, ast):
         func_name = ast.target
-        field = ast.field
-        field_sym = self.process_eval(field) if field is not None else None
-        # if ast.field:
-        #     raise NidavellirNotImplementedError("Chained calls", ast.line)
+        field_sym = None
 
-        if TreeBuilderHelpers.check_intrinsic_call(func_name):
-            return self.process_intrinsic_call(ast)
+        if isinstance(func_name, str):
+            if TreeBuilderHelpers.check_intrinsic_call(func_name):
+                return self.process_intrinsic_call(ast)
 
-        lookup, is_class, skip_arg_processing = self.resolve_call_lookup(
-            func_name,
-            ast.line,
-        )
+            field_sym = self.process_eval(ast.field) if ast.field is not None else None
+
+            lookup, is_class, skip_arg_processing = self.resolve_call_lookup(
+                func_name,
+                ast.line,
+            )
+
+        else:
+            field_sym = self.process_eval(func_name)
+
+            func_name = (
+                field_sym.field.name
+                if isinstance(field_sym, FieldAccessSymbol)
+                else None
+            )
+
+            lookup = None
+            is_class = False
+            skip_arg_processing = True
 
         params = self.process_call_arguments(
             ast,
@@ -404,11 +421,17 @@ class SymbolTreeBuilder:
             skip_arg_processing,
         )
 
-        sym = self.create_call_symbol(ast, lookup, func_name, params, field=field_sym)
+        sym = self.create_call_symbol(
+            ast,
+            lookup,
+            func_name,
+            params,
+            field=field_sym,
+        )
 
         if is_class:
             self.link_class_call(sym, params, lookup)
-        # raise Exception(ast)
+
         return sym
 
     # TODO: impl
@@ -687,6 +710,9 @@ class SymbolTreeBuilder:
         target_sym = self.process_eval(target)
 
         return FieldAccessSymbol(target=target_sym, field=field_sym, ast_node=ast)
+
+    def stmt_FieldAccessAST(self, ast):
+        return self.eval_FieldAccessAST(ast)
 
     def process_eval(self, ast):
         method_name = f"eval_{type(ast).__name__}"

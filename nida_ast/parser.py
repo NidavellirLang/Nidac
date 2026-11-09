@@ -325,7 +325,11 @@ class Parser:
                 end_line = last or self._make_line(end_token)
                 line = self._span_line(start_line, end_line, end_token)
                 left = CallAST(
-                    target=left, args=args, line=line, node_id=self.id_alloc.alloc()
+                    target=left,
+                    field=None,
+                    args=args,
+                    line=line,
+                    node_id=self.id_alloc.alloc(),
                 )
 
             else:

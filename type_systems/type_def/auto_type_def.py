@@ -426,11 +426,28 @@ class AutoTypeDefEngine:
 
         target = sym.field if sym.field is not None else sym.lookup
 
-        if isinstance(target, FunctionSymbol):
+        if (
+            isinstance(target, FieldAccessSymbol)
+            and isinstance(target.type, ClassMethodRefType)
+            and sym.lookup is None
+        ):
+            class_ref = target.type
+            fn = class_ref.lk
+
+            is_class = False
+            is_in_class = True
+            # sym.expr_self_resolve = True
+            sym.lookup = fn
+            sym.class_ref_type = class_ref
+
+            self._process_FunctionSymbol(fn)
+
+        elif isinstance(target, FunctionSymbol):
             fn = target
             is_class = False
             is_in_class = sym.field is not None
             self._process_FunctionSymbol(fn)
+
         else:
             is_class, is_in_class, fn = self._get_function_from_target(target)
 
@@ -564,7 +581,7 @@ class AutoTypeDefEngine:
 
     def resolve_target_var(self, sym):
         if isinstance(sym, FieldAccessSymbol):
-            target = sym.target
+            return sym.target
 
             if isinstance(target, VariableSymbol):
                 return target.lookup

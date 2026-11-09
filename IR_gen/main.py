@@ -155,9 +155,9 @@ class IRGen:
         if ref_type is not None:
             # self_ir = self.gen_symbol_ref(ref_type.instance_lk)
             try:
-                self_ir = self.gen_symbol_ref(ref_type.instance_lk)
+                self_ir = self.gen(ref_type.instance_lk.ast_node)
             except:
-                raise Exception(ast)
+                raise Exception(ref_type.instance_lk)
             args_irs.insert(0, self_ir)
 
         ir = CallIR(target, args_irs, type, field_ir)

@@ -9,12 +9,17 @@ class ExecutionTimer:
         self.current_watch = None
 
         self.timers = {}
+        self.max_str_len = 0
+
+    def name_update(self, name):
+        self.max_str_len = max(self.max_str_len, len(name) + 1)
+        self.current_watch = name
 
     def start(self, name):
         if self.current_watch is not None:
             self.stop()
 
-        self.current_watch = name
+        self.name_update(name)
         self.temp_time = time.perf_counter()
 
     def stop(self):
@@ -25,13 +30,21 @@ class ExecutionTimer:
 
         self.current_watch = None
 
+    def calc_air(self, name):
+        name_len = len(name)
+        air_len = self.max_str_len - name_len
+        return " " * air_len
+
     def print(self):
         if self.current_watch is not None:
             self.stop()
 
+        print("\n")
+
         for name, times in self.timers.items():
-            print(f"{name}: {times:.3f} seconds")
+            air = self.calc_air(name)
+            print(f"{name}{air}: {times:.3f} seconds")
 
         end_time = time.perf_counter()
 
-        print(f"Total: {end_time-self.start_time:.3f} seconds")
+        print(f"\nTotal: {end_time-self.start_time:.3f} seconds\n")

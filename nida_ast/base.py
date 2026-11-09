@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from dataclasses import dataclass, fields, field
 from utils.errors import Line
 
@@ -121,7 +123,7 @@ class IndexAccessAST(AST):
 @dataclass(slots=True, repr=False)
 class CallAST(AST):
     target: str
-    field: list
+    field: AST | None
     args: list
 
 
