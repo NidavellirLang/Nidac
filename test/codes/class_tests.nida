@@ -1,0 +1,155 @@
+class Namer:
+    str name
+
+    def __init__(self, name):
+        self.name = name
+
+    def get_name(self):
+        return self.name
+
+    def set_name(self, name):
+        self.name = name
+
+    def copy_name(self, other):
+        self.name = other.get_name()
+
+    def print_name(self):
+        name = self.name
+        print("Name:", name)
+
+
+class Player:
+    Namer nm
+    str tag
+
+    def __init__(self, name, tag):
+        self.nm = Namer(name)
+        self.tag = tag
+
+    def get_name(self):
+        return self.nm.get_name()
+
+    def set_name(self, name):
+        self.nm.set_name(name)
+
+    def copy_name(self, other):
+        self.nm.copy_name(other.nm)
+
+    def print_info(self):
+        print("Player:", self.tag, self.nm.get_name())
+
+    def get_namer(self):
+        return self.nm
+
+
+class Team:
+    Player captain
+    Player vice_captain
+
+    def __init__(self, captain, vice):
+        self.captain = captain
+        self.vice_captain = vice
+
+    def swap_names(self):
+        name = self.captain.get_name()
+        self.captain.set_name(self.vice_captain.get_name())
+        self.vice_captain.set_name(name)
+
+    def print_team(self):
+        self.captain.print_info()
+        self.vice_captain.print_info()
+
+
+p1 = Player("Ic3zy", "DEV")
+p2 = Player("Nidavellir", "COMPILER")
+
+team = Team(p1, p2)
+
+# 1. Multiple bound method references
+get_p1 = p1.get_name
+get_p2 = p2.get_name
+
+set_p1 = p1.set_name
+set_p2 = p2.set_name
+
+# 2. Same method, different receivers
+print(get_p1())
+print(get_p2())
+
+# 3. Bound method references after mutation
+set_p1("Ic3zy Modified")
+set_p2("Nidavellir Modified")
+
+print(get_p1())
+print(get_p2())
+
+# 4. Nested object references
+namer1 = p1.get_namer()
+namer2 = p2.get_namer()
+
+get_namer1 = namer1.get_name
+get_namer2 = namer2.get_name
+
+print(get_namer1())
+print(get_namer2())
+
+# 5. Cross-instance method calls
+p1.copy_name(p2)
+print(p1.get_name())
+
+# 6. Nested method references
+set_nested = p1.get_namer().set_name
+get_nested = p1.get_namer().get_name
+
+set_nested("Nested Mutation")
+print(get_nested())
+
+# 7. Method forwarding
+namer_set = namer2.set_name
+namer_set("Forwarded Name")
+
+p1.copy_name(p2)
+print(p1.get_name())
+
+# 8. Multiple aliases pointing to bound methods
+alias1 = p1.get_name
+alias2 = alias1
+alias3 = alias2
+
+print(alias1())
+print(alias2())
+print(alias3())
+
+# 9. Instance mutation through original and aliased references
+set_alias = p1.set_name
+set_alias("Alias Mutation")
+
+print(p1.get_name())
+print(alias1())
+
+# 10. Nested receiver mutation
+namer_alias = p2.get_namer
+nma = namer_alias()
+nma.set_name("Deep Mutation")
+
+print(p2.get_name())
+
+# 11. Cross-instance interaction through Team
+team.print_team()
+team.swap_names()
+team.print_team()
+
+# 12. Verify old references still point to their original instances
+print("P1:", get_p1())
+print("P2:", get_p2())
+print("N1:", get_namer1())
+print("N2:", get_namer2())
+
+# 13. Final mutations
+p1.set_name("Final Ic3zy")
+p2.set_name("Final Nidavellir")
+
+team.print_team()
+
+print("Final P1:", get_p1())
+print("Final P2:", get_p2())
