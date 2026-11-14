@@ -1,4 +1,4 @@
-from .analyzer import SymbolTreeBuilder
+from .tree_builder import SymbolTreeBuilder
 from utils import SysArgs
 from nida_ast.base import *
 

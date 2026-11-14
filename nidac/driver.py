@@ -138,7 +138,7 @@ class Nidac:
         self.symbol_table_b = semantic_analyze(self.asts, self.ctx)
         self.symbol_tree = self.symbol_table_b.st
 
-        self.ctx["stm"] = self.symbol_table_b.stm
+        # self.ctx["stm"] = self.symbol_table_b.stm
 
         if SysArgs.dump_ast_after_semantic:
             print("===== AST (after semantic analysis) =====")

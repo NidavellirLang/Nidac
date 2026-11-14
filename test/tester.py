@@ -19,7 +19,7 @@ class Tester:
         self.tested_pass = 0
         self.tested_error = 0
 
-    def read_nida_test_file(name, file_path) -> list[str]:
+    def read_nida_test_file(self, file_path) -> list[str]:
         file_path = BASE_DIR / file_path
 
         with open(file_path, "r", encoding="utf-8") as f:

@@ -6,6 +6,7 @@ from type_systems.types import *
 from utils.errors import *
 from utils.hashability import ishashable
 from ..intrinsics import INTRINSICS
+from ..analyzers import Analyzer
 
 
 class TreeBuilderHelpers:
@@ -22,11 +23,16 @@ class SymbolTreeBuilder:
         self.id_alloc = ctx["id_alloc"]
         self.ast_tree = ast_tree
         self.stm = SymbolTableManager()
+
+        ctx["stm"] = self.stm
+
         self.st = []
 
         self.visited_imports = set()
 
         self.current_class_name = None
+
+        self.analyzer = Analyzer(ctx)
 
     def get_id(self, ast):
         id = ast.node_id
@@ -723,6 +729,9 @@ class SymbolTreeBuilder:
         res = visitor(ast)
         id = self.get_id(ast)
         self.stm.define_symbol_id(id, res)
+
+        self.analyzer.run_eval(ast, res)
+
         return res
 
     def process_stmt(self, ast):
@@ -734,6 +743,8 @@ class SymbolTreeBuilder:
         res = visitor(ast)
         id = self.get_id(ast)
         self.stm.define_symbol_id(id, res)
+
+        self.analyzer.run_stmt(ast, res)
 
         return res
 
@@ -753,7 +764,7 @@ class SymbolTreeBuilder:
             if isinstance(types, str):
                 lk_c = self.stm.lookup_class_name(types)
                 if lk_c is not None:
-                    cl_type = ClassType(types)
+                    ast.type = ClassType(types)
                 else:
                     ast.type = resolve_type(ast.type)
 

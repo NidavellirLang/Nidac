@@ -3,7 +3,7 @@ from .ir_passer import IRPasser
 from nida_ast.base import *
 from type_systems.types import ClassType, Type, resolve_type
 from utils.errors import *
-from semantic.analyzer.symbol_types import *
+from semantic.tree_systems.symbol_types import *
 
 
 class IRGen:

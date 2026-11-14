@@ -1,5 +1,5 @@
 from ..types import *
-from semantic.analyzer.symbol_types import *
+from semantic.tree_systems.symbol_types import *
 from utils.errors import *
 
 
