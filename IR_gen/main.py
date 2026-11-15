@@ -16,10 +16,15 @@ class IRGen:
         self.IRs = []
         self.list_literal_count = 0
 
-    def get_lk(self, node):
+    def get_id(self, node):
         id = node.node_id
         if id is None:
             raise NidavellirInternalError("No node_id for CallAST")
+
+        return id
+
+    def get_lk(self, node):
+        id = self.get_id(node)
 
         lk = self.stm.lookup_symbol_id(id)
 
@@ -153,16 +158,10 @@ class IRGen:
         ref_type = lk.class_ref_type
 
         if ref_type is not None:
-            # self_ir = self.gen_symbol_ref(ref_type.instance_lk)
-            try:
-                self_ir = self.gen(ref_type.instance_lk.ast_node)
-            except:
-                raise Exception(ref_type.instance_lk)
+            self_ir = self.gen(ref_type.instance_lk.ast_node)
             args_irs.insert(0, self_ir)
 
         ir = CallIR(target, args_irs, type, field_ir)
-        if target == "Nida_Annon_38":
-            raise Exception(ast.args)
         return ir
 
     def gen_IntrinsicCallAST(self, ast):

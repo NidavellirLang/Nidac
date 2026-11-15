@@ -65,12 +65,13 @@ class SymbolRegistry:
 
 
 class Scope:
-    __slots__ = ("parent", "registry", "scope_type")
+    __slots__ = ("parent", "registry", "scope_type", "escaping_assignments")
 
     def __init__(self, parent=None, scope_type=None):
         self.parent = parent
         self.registry = SymbolRegistry()
         self.scope_type = scope_type
+        self.escaping_assignments = set()
 
     # Analyzer lookups: normal names.
 
@@ -115,6 +116,12 @@ class Scope:
 
     def lookup_symbol_id(self, symbol_id):
         return self.registry.lookup_symbol_id(symbol_id)
+
+    def mark_escaping(self, symbol_id):
+        self.escaping_assignments.add(symbol_id)
+
+    def is_escaping(self, assign_sym_id):
+        return assign_sym_id in self.escaping_assignments
 
 
 class SymbolTableManager:
@@ -197,3 +204,15 @@ class SymbolTableManager:
     def lookup_class_id(self, symbol_id):
         symbol = self.lookup_symbol_id(symbol_id)
         return symbol if isinstance(symbol, ClassSymbol) else None
+
+    def mark_escaping(self, symbol_id):
+        if self.current_scope is None or self.current_scope is self.global_scope:
+            raise NidavellirInternalError("Cannot mark global symbol as escaping")
+
+        self.current_scope.mark_escaping(symbol_id)
+
+    def is_escaping(self, assign_sym_id):
+        if self.current_scope is None or self.current_scope is self.global_scope:
+            raise NidavellirInternalError("Cannot mark global symbol as escaping")
+
+        return self.current_scope.is_escaping(assign_sym_id)

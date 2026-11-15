@@ -7,6 +7,10 @@ import traceback
 # from dataclasses import dataclass, fields, field as dc_field
 from dataclasses import dataclass, fields as dc_fields, field as dc_field, is_dataclass
 from nida_ast.base import AST, IntrinsicAST
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from .symbol_table import Scope
 
 
 class TrackedList(list):
@@ -270,6 +274,12 @@ class Symbol:
             max_items=max_items,
         )
 
+    @property
+    def node_id(self):
+        ast_node = self.ast_node
+        if ast_node:
+            return ast_node.node_id
+
 
 @dataclass(slots=True, repr=False)
 class AssignSymbol(Symbol):
@@ -307,6 +317,8 @@ class FunctionSymbol(Symbol):
     body: list[Symbol] = dc_field(default_factory=list)
     returned: list[Symbol] = dc_field(default_factory=list)
     is_called: bool = False
+
+    scope: Scope = None
 
 
 @dataclass(slots=True, repr=False)
