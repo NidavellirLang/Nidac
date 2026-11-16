@@ -200,7 +200,7 @@ class IRLowerer:
     def process_AssignIR(self, hir):
         lirs = LIRs()
 
-        target = hir.target
+        target = hir.name
         value = hir.value
         type_str = self.str_of(hir)
         is_reassign = hir.re_assign
@@ -289,7 +289,7 @@ class IRLowerer:
             type_str = self.str_of(arg)
 
             args_lir.append(ArgLIR(value_id, type_str))
-            arg_loads.append(LoadLIR(arg.target, value_id, type_str))
+            arg_loads.append(LoadLIR(arg.name, value_id, type_str))
 
         return args_lir, arg_loads
 
@@ -393,7 +393,7 @@ class IRLowerer:
             isinstance(self.type_of(hir), NoneType) or self.type_of(hir) is None
         )
         type_str = self.str_of(hir)
-        target = hir.target
+        target = hir.name
         args = hir.args
 
         lirs = LIRs()

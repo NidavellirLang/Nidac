@@ -44,13 +44,11 @@ class IRPasser:
                         f"Unknown IR destination: " f"{result.destination!r}"
                     )
 
-        num = NumberIR("0")
-        num.type = IntType(byte_size=4, signed=True)
+        num = NumberIR(value=0, type=IntType(byte_size=4, signed=True))
 
-        main_stmts.append(ReturnIR(num, type=num.type))
+        main_stmts.append(ReturnIR(value=num, type=num.type))
 
         main_fn = FunctionIR(
-            decs=[],
             name="main",
             args=[],
             body=[*pre_main_stmts, *main_stmts],
@@ -108,7 +106,7 @@ class IRPasser:
                 ir.line,
             )
 
-        ir.target = field.field
+        ir.name = field.field
         ir.args = [
             *(self.run_expr(arg) for arg in ir.args),
         ]
@@ -120,8 +118,8 @@ class IRPasser:
         if not self._resolve_method_reference(ir):
             ir.args = [self.run_expr(arg) for arg in ir.args]
 
-            if ir.target in self.generated_functions:
-                ir.target = self.generated_functions[ir.target].name
+            if ir.name in self.generated_functions:
+                ir.name = self.generated_functions[ir.name].name
 
         if is_expr:
             return ir
@@ -144,7 +142,7 @@ class IRPasser:
         if isinstance(value, FieldAccessIR) and isinstance(value.type, RefType):
             field = value
 
-            ir.value = VariableIR(field.field)
+            ir.value = VariableIR(name=field.field)
             ir.value.type = field.type
 
             ir.value.receiver = self.run_expr(field.target)
@@ -157,7 +155,7 @@ class IRPasser:
     def stmt_DefinitionIR(self, ir):
         value = self.run_expr(ir.value)
 
-        asgn = AssignIR(ir.target, value, ir.type)
+        asgn = AssignIR(ir.name, value, ir.type)
         asgn.re_assign = True
 
         fn_name = self.f_alloc.anon()
@@ -220,9 +218,9 @@ class IRPasser:
 
         fields = []
         for field in assignments:
-            fields.append((field.target, field.type, field.value))
+            fields.append((field.name, field.type, field.value))
 
-        struct = StructIR(ir.name, assignments, fields)
+        struct = StructIR(name=ir.name, fields=assignments, class_fields=fields)
         # raise Exception(struct)
 
         methods = [fn for fn in functions if fn.ast_name != "__init__"]
@@ -253,9 +251,9 @@ class IRPasser:
 
         body = [
             AssignIR(
-                "self",
-                NewIR(ir.name, class_type),
-                class_type,
+                name="self",
+                value=NewIR(class_name=ir.name, type=class_type),
+                type=class_type,
             ),
             # *field_setters,
         ]
@@ -263,35 +261,19 @@ class IRPasser:
         if init is not None:
             body.extend(init.body)
 
-        body.append(ReturnIR(VariableIR("self", class_type), type=class_type))
+        body.append(
+            ReturnIR(value=VariableIR(name="self", type=class_type), type=class_type)
+        )
 
         args = init.args[1:] if init is not None else []
 
         return FunctionIR(
-            decs=[],
             name=fn_name,
             args=args,
             body=body,
             type=class_type,
             is_main_func=False,
             is_static=False,
-        )
-
-    def _field_setter(self, class_type, field_name, field_type, default_value):
-        raise
-        if default_value is None:
-            if not isinstance(field_type, ClassType):
-                return None
-
-            default_value = self.run_expr(CallIR(field_type.name, [], field_type))
-
-        return AssignIR(
-            "self",
-            default_value,
-            field_type,
-            chain=[field_name],
-            base_type=class_type,
-            chain_types=[field_type],
         )
 
     def stmt_IfIR(self, ir):
@@ -306,9 +288,9 @@ class IRPasser:
                 continue
 
             assign_ir = AssignIR(
-                assign_sym.name,
-                NoneIR(True),
-                assign_sym.type,
+                name=assign_sym.name,
+                value=NoneIR(air=True),
+                type=assign_sym.type,
             )
 
             assigns.append(IR_Box(assign_ir, destination=PreMain))

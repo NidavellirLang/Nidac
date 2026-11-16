@@ -394,13 +394,6 @@ class ElifSymbol(Symbol):
     cond: Symbol
     body: list[Symbol] = dc_field(default_factory=list)
 
-    # TODO: impl
-    # def __init__(self, cond, body, ast_node, scope):
-    #     self.cond = cond
-    #     self.body = body
-    #     self.scope = scope
-    #     self.ast_node = ast_node
-
 
 @dataclass(slots=True, repr=False)
 class WhileSymbol(Symbol):
@@ -425,26 +418,6 @@ class ClassSymbol(Symbol):
     body: list[Symbol] = dc_field(default_factory=list)
     fields: dict[str, Symbol] = dc_field(default_factory=dict)
     methods: dict[str, Symbol] = dc_field(default_factory=dict)
-    pass
-    # TODO: impl
-    # def __init__(self, name, ast_node):
-    #     self.name = name
-    #     self.ast_node = ast_node
-
-    #     self.body = []
-
-    #     self.init_fn = None
-    #     self.params = None
-
-    #     self.fields = {}
-    #     self.field_syms = {}
-    #     self.methods = {}
-
-    #     self.method_syms = {}
-
-    #     self.uses = []
-
-    #     self.type = ClassType(name)
 
 
 @dataclass(slots=True, repr=False)
@@ -497,11 +470,3 @@ class IdentifierSymbol(Symbol):
     name: str
     lookup: Symbol | None = None
     resolve_name: str | None = None
-    pass
-    # TODO: impl
-    # def __init__(self, name, ast_node):
-    #     self.name = name
-    #     self.ast_node = ast_node
-    #     self.lookup = None
-    #     self.field_name = None
-    #     self.type = None

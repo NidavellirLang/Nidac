@@ -34,7 +34,7 @@ class IRGen:
         return lk
 
     def gen_PassAST(self, ast):
-        return PassIR()
+        return PassIR(node_id=self.get_id(ast))
 
     def gen_AssignAST(self, ast):
         value = ast.value
@@ -55,7 +55,7 @@ class IRGen:
         # if isinstance(value, UnaryOpAST):
         #     val_res = self._gen_unary_op(target, value)
         if value is None:
-            val_res = NoneIR(air=True)
+            val_res = NoneIR(air=True, node_id=self.get_id(ast))
         else:
             val_res = self.gen(value)
 
@@ -63,11 +63,12 @@ class IRGen:
             val_res.type = var_type
 
         return AssignIR(
-            target,
-            val_res,
-            var_type,
+            name=target,
+            value=val_res,
+            type=var_type,
             re_assign=is_re_assign,
             field=field_ir,
+            node_id=self.get_id(ast),
         )
 
     def _type_of(self, type_val):
@@ -96,9 +97,10 @@ class IRGen:
         idn_name = self._get_name_from_IdentifierAST(field)
 
         field_ir = FieldAccessIR(
-            target_ir,
-            idn_name,
-            self._type_of(lk.type),
+            target=target_ir,
+            field=idn_name,
+            type=self._type_of(lk.type),
+            node_id=self.get_id(ast),
         )
 
         # raise Exception(idn_lk)
@@ -107,12 +109,12 @@ class IRGen:
     def gen_SelfAST(self, ast):
         lk = self.get_lk(ast)
         type = ClassType(lk.class_name)
-        return VariableIR("self", type)
+        return VariableIR(name="self", type=type, node_id=self.get_id(ast))
 
     def gen_ReturnAST(self, ast):
         value = ast.value
         res = self.gen(value)
-        return ReturnIR(res)
+        return ReturnIR(value=res, node_id=self.get_id(ast))
 
     def gen_symbol_ref(self, sym):
         if isinstance(sym, VariableSymbol):
@@ -121,21 +123,24 @@ class IRGen:
                 class_name = lookup.name
                 # raise Exception(class_name)
                 class_ref_type = ClassType(class_name)
-                return VariableIR(sym.name, class_ref_type)
+                return VariableIR(name=sym.name, type=class_ref_type)
 
             return self.gen_symbol_ref(sym.lookup)
 
         if isinstance(sym, AssignSymbol):
-            return VariableIR(sym.name, sym.type)
+            return VariableIR(
+                name=sym.name, type=sym.type, node_id=self.get_id(sym.ast_node)
+            )
 
         if isinstance(sym, FieldAccessSymbol):
             target = self.gen_symbol_ref(sym.target)
             field = sym.field
 
             return FieldAccessIR(
-                target,
-                field.lookup.name,
-                sym.type,
+                target=target,
+                field=field.lookup.name,
+                type=sym.type,
+                node_id=self.get_id(sym.ast_node),
             )
 
         raise NidavellirInternalError(f"Cannot generate symbol reference: {sym!r}")
@@ -161,7 +166,13 @@ class IRGen:
             self_ir = self.gen(ref_type.instance_lk.ast_node)
             args_irs.insert(0, self_ir)
 
-        ir = CallIR(target, args_irs, type, field_ir)
+        ir = CallIR(
+            name=target,
+            args=args_irs,
+            type=type,
+            field=field_ir,
+            node_id=self.get_id(ast),
+        )
         return ir
 
     def gen_IntrinsicCallAST(self, ast):
@@ -175,13 +186,19 @@ class IRGen:
         for arg in args:
             n_args.append(self.gen(arg))
 
-        ir = IntrinsicCallIR(intrinsic, name, n_args, type)
+        ir = IntrinsicCallIR(
+            intrinsic=intrinsic,
+            name=name,
+            args=n_args,
+            type=type,
+            node_id=self.get_id(ast),
+        )
         handler = intrinsic.handler
         new_ir = handler(ir)
         return new_ir
 
     def gen_StringAST(self, ast):
-        return StringLiteralIR(ast.value)
+        return StringLiteralIR(value=ast.value, node_id=self.get_id(ast))
 
     def gen_NumberAST(self, ast):
         id = ast.node_id
@@ -194,7 +211,7 @@ class IRGen:
 
         type = lk.type
 
-        return NumberIR(ast.value, type)
+        return NumberIR(value=ast.value, type=type, node_id=self.get_id(ast))
 
     def gen_VariableAST(self, ast):
         lk = self.get_lk(ast)
@@ -211,7 +228,7 @@ class IRGen:
                 raise Exception(lk)
                 raise NidavellirInternalError(f"No type for VariableAST")
 
-        return VariableIR(name, type)
+        return VariableIR(name=name, type=type, node_id=self.get_id(ast))
 
     def gen_BinaryOpAST(self, ast):
         left = ast.left
@@ -223,7 +240,9 @@ class IRGen:
         lk = self.get_lk(ast)
         type = lk.type
 
-        return BinaryOpIR(left_ir, right_ir, op, type)
+        return BinaryOpIR(
+            left=left_ir, right=right_ir, op=op, type=type, node_id=self.get_id(ast)
+        )
 
     def gen_FunctionAST(self, ast):
         lk = self.get_lk(ast)
@@ -249,7 +268,14 @@ class IRGen:
             res = self.gen(b)
             ir_body.append(res)
 
-        ir = FunctionIR(decs, name, args_irs, ir_body, type, ast_name=ast.name)
+        ir = FunctionIR(
+            name=name,
+            args=args_irs,
+            body=ir_body,
+            ast_name=ast.name,
+            type=type,
+            node_id=self.get_id(ast),
+        )
 
         return ir
 
@@ -271,6 +297,7 @@ class IRGen:
             symbols=symbols,
             alias=alias,
             resolved_module=module,
+            node_id=self.get_id(ast),
         )
 
     def gen_BlockAST(self, ast):
@@ -279,7 +306,7 @@ class IRGen:
         for n in body:
             body_irs.append(self.gen(n))
 
-        return BlockIR(body_irs)
+        return BlockIR(body=body_irs, node_id=self.get_id(ast))
 
     def gen_ElifAST(self, ast):
         cond = ast.cond
@@ -290,7 +317,7 @@ class IRGen:
         for n in body:
             body_irs.append(self.gen(n))
 
-        return ElifIR(cond_ir, body_irs)
+        return ElifIR(cond=cond_ir, body=body_irs, node_id=self.get_id(ast))
 
     def gen_IfAST(self, ast):
         cond = ast.cond
@@ -311,12 +338,20 @@ class IRGen:
 
         else_body_irs = self.gen(else_body) if else_body is not None else None
 
-        return IfIR(cond_ir, body_irs, elifs_irs, else_body_irs, lk)
+        return IfIR(
+            cond=cond_ir,
+            body=body_irs,
+            elifs=elifs_irs,
+            else_body=else_body_irs,
+            if_sym=lk,
+            node_id=self.get_id(ast),
+        )
 
-    def gen_GroupAST(self, ast):
-        expr = ast.expr
-        expr_ir = self.gen(expr)
-        return GroupIR(expr_ir)
+    # TODO: impl
+    # def gen_GroupAST(self, ast):
+    #     expr = ast.expr
+    #     expr_ir = self.gen(expr)
+    #     return GroupIR(expr_ir)
 
     def gen_ForAST(self, ast):
         target = ast.target
@@ -329,25 +364,28 @@ class IRGen:
         for n in body:
             body_irs.append(self.gen(n))
 
-        return ForIR(target_ir, source_ir, body_irs)
+        return ForIR(
+            target=target_ir, source=source_ir, body=body_irs, node_id=self.get_id(ast)
+        )
 
-    def gen_WhileAST(self, ast):
-        cond = ast.cond
-        body = ast.body
+    # TODO: impl
+    # def gen_WhileAST(self, ast):
+    #     cond = ast.cond
+    #     body = ast.body
 
-        body_irs = []
-        for n in body:
-            body_irs.append(self.gen(n))
+    #     body_irs = []
+    #     for n in body:
+    #         body_irs.append(self.gen(n))
 
-        cond_ir = self.gen(cond)
-        return WhileIR(cond_ir, body_irs)
+    #     cond_ir = self.gen(cond)
+    #     return WhileIR(cond_ir, body_irs)
 
     def gen_BooleanAST(self, ast):
         value = ast.value
-        return BooleanIR(value)
+        return BooleanIR(value=value, node_id=self.get_id(ast))
 
     def gen_NoneAST(self, ast):
-        return NoneIR()
+        return NoneIR(node_id=self.get_id(ast))
 
     def gen_DefinitionAST(self, ast):
         lk = self.get_lk(ast)
@@ -357,7 +395,9 @@ class IRGen:
         value = ast.value
 
         value_ir = self.gen(value)
-        return DefinitionIR(target, value_ir, type)
+        return DefinitionIR(
+            name=target, value=value_ir, type=type, node_id=self.get_id(ast)
+        )
 
     def gen_UnaryOpAST(self, ast):
         op = ast.op
@@ -367,21 +407,22 @@ class IRGen:
         type = lk.type
 
         value_ir = self.gen(value)
-        return UnaryOpIR(op, value_ir, type)
+        return UnaryOpIR(op=op, value=value_ir, type=type, node_id=self.get_id(ast))
 
-    def gen_ListLiteralAST(self, ast):
-        elements = []
+    # TODO: impl
+    # def gen_ListLiteralAST(self, ast):
+    #     elements = []
 
-        for e in ast.elements:
-            element_ir = self.gen(e)
-            elements.append(element_ir)
+    #     for e in ast.elements:
+    #         element_ir = self.gen(e)
+    #         elements.append(element_ir)
 
-        lk = self.get_lk(ast)
-        type = lk.type
+    #     lk = self.get_lk(ast)
+    #     type = lk.type
 
-        literal_ir = ListLiteralIR(elements, type)
-        literal_ir.element_list_id = self._next_list_id()
-        return literal_ir
+    #     literal_ir = ListLiteralIR(elements, type)
+    #     literal_ir.element_list_id = self._next_list_id()
+    #     return literal_ir
 
     def _next_list_id(self):
         list_id = self.list_literal_count
@@ -432,14 +473,21 @@ class IRGen:
 
         new_body = self.process_class_body(body)
 
-        return ClassIR(name, id, new_body, self._class_fields(ast))
+        return ClassIR(
+            name=name,
+            body=new_body,
+            fields=self._class_fields(ast),
+            node_id=self.get_id(ast),
+        )
 
     def _gen_unary_op(self, target, ast):
         op = ast.op
         right = ast.right
 
         right_ir = self.gen(right)
-        return BinaryOpIR(left=VariableIR(target), op=op, right=right_ir)
+        return BinaryOpIR(
+            left=VariableIR(target), op=op, right=right_ir, node_id=self.get_id(ast)
+        )
 
     def gen(self, ast):
         name = ast.__class__.__name__

@@ -21,9 +21,9 @@ def print_intrinsic(Hir):
         temp_args.append(arg)
         if arg_c == 4:
             is_last = (top_c * 4) == len(args)
-            temp_args.append(BooleanIR(is_last))
+            temp_args.append(BooleanIR(value=is_last))
 
-            c_call_node = CallIR("_Nida_print_a4", temp_args, type=NoneType())
+            c_call_node = CallIR(name="_Nida_print_a4", args=temp_args, type=NoneType())
             c_call_node.imported_func_call = True
 
             chunks.append(c_call_node)
@@ -32,17 +32,19 @@ def print_intrinsic(Hir):
             top_c += 1
 
     if temp_args:
-        extra_args = [BooleanIR(True)]
+        extra_args = [BooleanIR(value=True)]
         temp_args.extend(extra_args)
 
         c_call_node = CallIR(
-            f"_Nida_print_a{len(temp_args)-len(extra_args)}", temp_args, type=NoneType()
+            name=f"_Nida_print_a{len(temp_args)-len(extra_args)}",
+            args=temp_args,
+            type=NoneType(),
         )
-        c_call_node.imported_func_call = True
+        # c_call_node.imported_func_call = True
 
         chunks.append(c_call_node)
 
-    return BlockIR(chunks)
+    return BlockIR(body=chunks)
 
 
 def range_intrinsic(Hir):
@@ -56,13 +58,13 @@ def range_intrinsic(Hir):
     num_type = args[0].type if args else None
 
     if arg_c == 1:
-        start = NumberIR(0, num_type)
+        start = NumberIR(value=0, type=num_type)
         end = args[0]
-        step = NumberIR(1, num_type)
+        step = NumberIR(value=1, type=num_type)
     elif arg_c == 2:
         start = args[0]
         end = args[1]
-        step = NumberIR(1, num_type)
+        step = NumberIR(value=1, type=num_type)
     elif arg_c == 3:
         start = args[0]
         end = args[1]
