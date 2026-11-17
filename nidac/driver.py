@@ -6,7 +6,7 @@ from semantic import semantic_analyze
 from import_systems import ImportSystem
 
 from type_systems.main import TypeSystem
-from IR_gen import IRGen
+from IR_gen import IRProcessor
 from LIR_gen import IRLowerer
 from C_gen import C_Gen
 from C_gen import HeaderGenerator
@@ -157,8 +157,8 @@ class Nidac:
     # ------------------------------------------------------------------
 
     def HIRGen(self):
-        hir = IRGen(self.asts, self.ctx)
-        self.hir = hir.run()
+        hirp = IRProcessor(self.asts, self.ctx)
+        self.hir = hirp.run()
 
         if SysArgs.dump_hir:
             print("===== HIR =====")

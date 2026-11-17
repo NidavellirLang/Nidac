@@ -1,5 +1,4 @@
 from .irs import *
-from .ir_passer import IRPasser
 from nida_ast.base import *
 from type_systems.types import ClassType, Type, resolve_type
 from utils.errors import *
@@ -39,25 +38,64 @@ class IRGen:
     def _create_function_arg(self, name, type, default, id):
         return ParameterIR(name=name, type=type, default=default, node_id=id)
 
-    def _gen_func_args(self, args: list[AssignAST]):
+    def _create_self_arg(self, ast):
+        lk = self.get_lk(ast)
+        if lk.type is None:
+            raise NidavellirInternalError("SelfAST has no resolved class type")
+
+        return ParameterIR(
+            name="self",
+            type=lk.type,
+            default=NoneIR(),
+            node_id=self.get_id(ast),
+        )
+
+    def _gen_func_args(self, args):
         new_args = []
+
         for arg in args:
+            if isinstance(arg, SelfAST):
+                new_args.append(self._create_self_arg(arg))
+                continue
+
             if not isinstance(arg, AssignAST):
-                raise NidavellirInternalError("Function args must be AssignAST")
+                raise NidavellirInternalError(
+                    f"Function args must be AssignAST or SelfAST, got {type(arg).__name__}"
+                )
 
             lk = self.get_lk(arg)
-            name = lk.name
-            type = lk.type
             value = self.gen_expr(arg.value) if arg.value is not None else NoneIR()
 
-            param_ir = self._create_function_arg(name, type, value, self.get_id(arg))
-
-            new_args.append(param_ir)
+            new_args.append(
+                self._create_function_arg(
+                    lk.name,
+                    lk.type,
+                    value,
+                    self.get_id(arg),
+                )
+            )
 
         return new_args
 
     def _gen_call_args(self, args: list[AST]) -> list[ExprIR]:
         return [self.gen_expr(arg) for arg in args]
+
+    def _create_class_fields(self, lk):
+        fields = []
+        for key, val in lk.fields.items():
+            decl = FieldDeclIR(
+                name=val.name,
+                default=val.value,
+                type=val.type,
+                node_id=self.get_id(val),
+            )
+            fields.append(decl)
+
+        return fields
+
+    def _get_name_from_IdentifierAST(self, ast):
+        lk = self.get_lk(ast)
+        return lk.resolve_name
 
     # ---------------------
     # ----- Statement -----
@@ -66,23 +104,25 @@ class IRGen:
     def gen_AssignAST(self, ast):
         lk = self.get_lk(ast)
 
-        is_re_assign = lk.parent_assign is not None
-        target = lk.name
-        type = lk.type
+        re_assign = lk.parent_assign is not None
 
-        field = self.gen_expr(ast.field) if ast.field is not None else None
+        target = (
+            self.gen_expr(ast.field)
+            if ast.field is not None
+            else IdentifierIR(name=lk.name)
+        )
 
-        if ast.value is None:
-            value = NoneIR(air=True, node_id=self.get_id(ast))
-        else:
-            value = self.gen_expr(ast.value)
+        value = (
+            self.gen_expr(ast.value)
+            if ast.value is not None
+            else NoneIR(air=True, node_id=self.get_id(ast))
+        )
 
         return AssignIR(
-            name=target,
+            target=target,
             value=value,
-            type=type,
-            re_assign=is_re_assign,
-            field=field,
+            type=lk.type,
+            re_assign=re_assign,
             node_id=self.get_id(ast),
         )
 
@@ -116,9 +156,68 @@ class IRGen:
         value = self.gen_expr(ast.value) if ast.value is not None else NoneIR(air=True)
         return ReturnIR(value=value, node_id=self.get_id(ast))
 
+    def gen_BlockAST(self, ast):
+        body = self.gen_stmts(ast.body)
+
+        return BlockIR(body=body, node_id=self.get_id(ast))
+
+    def gen_ElifAST(self, ast):
+        cond = self.gen_expr(ast.cond)
+        body = self.gen_stmts(ast.body)
+
+        return ElifIR(cond=cond, body=body, node_id=self.get_id(ast))
+
+    def gen_IfAST(self, ast):
+        lk = self.get_lk(ast)
+
+        cond = self.gen_expr(ast.cond)
+        body = self.gen_stmts(ast.body)
+        elifs = self.gen_stmts(ast.elifs)
+
+        else_body_irs = (
+            self.gen_stmt(ast.else_body) if ast.else_body is not None else None
+        )
+
+        return IfIR(
+            cond=cond,
+            body=body,
+            elifs=elifs,
+            else_body=else_body_irs,
+            if_sym=lk,
+            node_id=self.get_id(ast),
+        )
+
+    def gen_ClassAST(self, ast):
+        name = ast.name
+        lk = self.get_lk(ast)
+
+        fields = self._create_class_fields(lk)
+        field_ids = {field.node_id for field in fields}
+
+        body = [
+            self.gen_stmt(stmt)
+            for stmt in ast.body
+            if self.get_id(stmt) not in field_ids
+        ]
+
+        return ClassIR(
+            name=name,
+            body=body,
+            fields=fields,
+            node_id=self.get_id(ast),
+        )
+
     # ---------------------
     # ---- Expression -----
     # ---------------------
+
+    def gen_SelfAST(self, ast):
+        lk = self.get_lk(ast)
+        return VariableIR(
+            name="self",
+            type=ClassType(lk.class_name),
+            node_id=self.get_id(ast),
+        )
 
     def gen_BinaryOpAST(self, ast):
         left = self.gen_expr(ast.left)
@@ -153,39 +252,80 @@ class IRGen:
         intrinsic = lk.intrinsic
 
         name = intrinsic.name
+        target = IdentifierIR(name=name)
 
         args = self._gen_call_args(ast.args)
 
         ir = IntrinsicCallIR(
             intrinsic=intrinsic,
-            name=name,
+            target=target,
             args=args,
             type=type,
             node_id=self.get_id(ast),
         )
 
-        handler = intrinsic.handler
-        new_ir = handler(ir)
-        return new_ir
+        # handler = intrinsic.handler
+        # new_ir = handler(ir)
+        return ir
 
     def gen_CallAST(self, ast):
         lk = self.get_lk(ast)
         if isinstance(lk, IntrinsicCallSymbol):
             return self.gen_IntrinsicCallAST(ast)
 
-        target = lk.lookup.name
-        field_ir = self.gen_expr(ast.field) if ast.field is not None else None
+        name = lk.lookup.name
+        field = self.gen_expr(ast.field) if ast.field is not None else None
+        if field is not None:
+            target = field
+        else:
+            target = IdentifierIR(name=name)
+
         type = lk.type
 
-        args_irs = self._gen_call_args(ast.args)
+        args = self._gen_call_args(ast.args)
 
         return CallIR(
-            name=target,
-            args=args_irs,
+            target=target,
+            args=args,
             type=type,
-            field=field_ir,
             node_id=self.get_id(ast),
         )
+
+    def gen_StringAST(self, ast):
+        return StringLiteralIR(value=ast.value, node_id=self.get_id(ast))
+
+    def gen_BooleanAST(self, ast):
+        value = ast.value
+        return BooleanIR(value=value, node_id=self.get_id(ast))
+
+    def gen_NoneAST(self, ast):
+        return NoneIR(node_id=self.get_id(ast))
+
+    def gen_UnaryOpAST(self, ast):
+        op = ast.op
+
+        lk = self.get_lk(ast)
+        type = lk.type
+        # raise Exception(ast)
+        value = self.gen_expr(ast.right)
+        return UnaryOpIR(op=op, value=value, type=type, node_id=self.get_id(ast))
+
+    def gen_FieldAccessAST(self, ast):
+        lk = self.get_lk(ast)
+        target_ir = self.gen(ast.target)
+        field = ast.field
+
+        idn_name = self._get_name_from_IdentifierAST(field)
+
+        field_ir = FieldAccessIR(
+            target=target_ir,
+            field=idn_name,
+            type=lk.type,
+            node_id=self.get_id(ast),
+        )
+
+        # raise Exception(idn_lk)
+        return field_ir
 
     # ---------------------
     # ---- Generators -----
@@ -220,7 +360,7 @@ class IRGen:
         if isinstance(result, ExprIR):
             return StmtExprIR(
                 expr=result,
-                node_id=self.new_node_id(),
+                node_id=self.get_id(ast),
             )
 
         if not isinstance(result, StmtIR):

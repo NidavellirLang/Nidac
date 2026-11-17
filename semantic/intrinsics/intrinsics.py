@@ -7,7 +7,7 @@ INTRINSICS = {
         name="print",
         type=NoneType(),
         params=ParamsType(AnyType(), is_variadic=True),
-        handler=print_intrinsic,
+        handler=None,
     ),
     "range": IntrinsicAST(
         name="range",

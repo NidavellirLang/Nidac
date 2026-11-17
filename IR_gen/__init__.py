@@ -1,3 +1,3 @@
-from .main import IRGen
+from .ir_processor import IRProcessor
 
-__all__ = ["IRGen"]
+__all__ = ["IRProcessor"]

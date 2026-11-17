@@ -1,7 +1,17 @@
 # Current State
 
 ## Active Work
+
 Completing class and method semantics, particularly callable references, bound method resolution, and function return values.
+
+The HIR-to-LIR lowering code is also being adapted to the updated assignment and call target representation.
+
+### Current IR Changes
+
+- `AssignIR` no longer uses a separate `name` and `field` representation. Its `target` is either `IdentifierIR` or `FieldAccessIR`.
+- `CallIR` is moving from `name` to `target`, with the same target contract: `IdentifierIR` or `FieldAccessIR`.
+- LIR generation must distinguish identifier calls from field/method calls and preserve receiver evaluation.
+- These changes are still being integrated; do not consider the lowering implementation fully verified yet.
 
 ## Known Issues
 
@@ -32,12 +42,4 @@ A comprehensive local regression program covering method references, aliases, ne
 ## Next Steps
 
 - Fix callable return-value resolution, especially functions returning bound method references.
-- Preserve bound receiver identity when a method reference is returned from a function.
-- Expand tests for normal function references, method references, aliases, and callable return values.
-- Continue completing the remaining class and method semantics.
-- Defer compiler optimizations until language semantics and core features are stable.
-
-## Testing Policy
-
-- Local regression and experimental test files are not committed to GitHub.
-- Only intended project source changes and repository files should be included in commits.
+- Preserve bound receiver identity when a method reference is returned from a

@@ -5,9 +5,15 @@ from typing import Any, ClassVar
 from utils.tree_utils import TreeReprMixin, _paint, _YELLOW
 
 
+@dataclass(frozen=True, slots=True)
+class Child:
+    name: str
+    optional: bool = False
+
+
 @dataclass(slots=True, kw_only=True, repr=False)
 class IR(TreeReprMixin):
-    __child__: ClassVar[tuple[str, ...]] = ()
+    __child__: ClassVar[tuple[str | Child, ...]] = ()
 
     _tree_skip_fields = ("node_id",)
 
@@ -42,17 +48,20 @@ class ExprIR(IR):
 
 @dataclass(slots=True, kw_only=True, repr=False)
 class ParameterIR(IR):
-    """Represents a parameter in the Intermediate Representation (IR).
-
-    This class defines a parameter with a name, type, and an optional default value.
-    It inherits from the IR class, which likely serves as the base for all IR nodes.
-    """
-
-    __child__ = ("default",)  # Specifies that 'default' is a child node in the IR tree
+    __child__ = (Child("default", optional=True),)
 
     name: str
     type: Type
     default: ExprIR = None
+
+
+@dataclass(slots=True, kw_only=True, repr=False)
+class FieldDeclIR(IR):
+    __child__ = (Child("default", optional=True),)
+
+    name: str
+    type: Type
+    default: ExprIR | None = None
 
 
 # ---------------------
@@ -72,12 +81,11 @@ class EliminatedIR(StmtIR):
 
 @dataclass(slots=True, kw_only=True, repr=False)
 class AssignIR(StmtIR):
-    __child__ = ("value", "field")
+    __child__ = ("value", "target")
 
-    name: str
+    target: IdentifierIR | FieldAccessIR
     value: ExprIR = None
-    re_assign: StmtIR = None
-    field: ExprIR = None
+    re_assign: bool = False
 
     # def __init__(
     #     self,
@@ -97,7 +105,7 @@ class AssignIR(StmtIR):
 
 @dataclass(slots=True, kw_only=True, repr=False)
 class FunctionIR(StmtIR):
-    __child__ = ("args", "body")
+    __child__ = ("args", "body", "decorators")
 
     name: str
     args: list[AssignIR] = dc_field(default_factory=list)
@@ -179,7 +187,7 @@ class IRImport(StmtIR):
 
 @dataclass(slots=True, kw_only=True, repr=False)
 class IfIR(StmtIR):
-    __child__ = ("cond", "body", "elifs", "else_body")
+    __child__ = ("cond", "body", "elifs", Child("else_body", optional=True))
 
     cond: ExprIR
     body: list[StmtIR] = dc_field(default_factory=list)
@@ -241,7 +249,7 @@ class WhileIR(StmtIR):
 
 @dataclass(slots=True, kw_only=True, repr=False)
 class DefinitionIR(StmtIR):
-    __child__ = ("value",)
+    __child__ = (Child("value", optional=True),)
 
     name: str
     value: ExprIR = None
@@ -257,6 +265,8 @@ class DefinitionIR(StmtIR):
 
 @dataclass(slots=True, kw_only=True, repr=False)  # only use for ir_passer
 class StructIR(StmtIR):
+    __child__ = ("fields", Child("initialize_function", optional=True))
+
     name: str
     fields: list[AssignIR] = dc_field(default_factory=list)
     class_fields: list[tuple] = dc_field(default_factory=list)
@@ -273,6 +283,8 @@ class StructIR(StmtIR):
 
 @dataclass(slots=True, kw_only=True, repr=False)
 class StmtExprIR(StmtIR):
+    __child__ = ("expr",)
+
     expr: ExprIR
 
 
@@ -307,10 +319,10 @@ class NoneIR(ExprIR):
 
 @dataclass(slots=True, kw_only=True, repr=False)
 class IntrinsicCallIR(ExprIR):
-    __child__ = ("args",)
+    __child__ = ("target", "args")
 
     intrinsic: Any
-    name: str
+    target: IdentifierIR | FieldAccessIR
     args: list[ExprIR]
 
     # def __init__(self, intrinsic, name, args, type):
@@ -375,11 +387,10 @@ class VariableIR(ExprIR):
 
 @dataclass(slots=True, kw_only=True, repr=False)
 class CallIR(ExprIR):
-    __child__ = ("args", "field")
+    __child__ = ("target", "args")
 
-    name: str
+    target: IdentifierIR | FieldAccessIR
     args: list[ExprIR]
-    field: ExprIR = None
     runtime_call: bool = False
 
     # def __init__(self, target, args, type=None, field=None):
