@@ -238,6 +238,11 @@ class AutoTypeDefEngine:
             offset = getattr(call, "arg_offset", 0)
             for idx, arg in enumerate(call.args):
                 if arg.type is None:
+                    # TODO: Fix this method to support nested referenced function calls.
+                    if isinstance(arg, CallSymbol):
+                        if arg.lookup is sym:
+                            continue
+
                     self.process(arg)
 
                 arg_type = arg.type
@@ -439,13 +444,14 @@ class AutoTypeDefEngine:
             # sym.expr_self_resolve = True
             sym.lookup = fn
             sym.class_ref_type = class_ref
-
             self._process_FunctionSymbol(fn)
 
         elif isinstance(target, FunctionSymbol):
             fn = target
             is_class = False
             is_in_class = sym.field is not None
+            for arg in sym.args:
+                self.process(arg)
             self._process_FunctionSymbol(fn)
 
         else:
@@ -467,6 +473,10 @@ class AutoTypeDefEngine:
             fn.uses.extend(calls)
             # if sym not in fn.uses:
             #     fn.uses.append(sym)
+            for arg in sym.args:
+                self.process(arg)
+            # raise Exception(sym.args)
+
             self._process_FunctionSymbol(fn)
             if sym.field is not None:
                 self.process(sym.field)

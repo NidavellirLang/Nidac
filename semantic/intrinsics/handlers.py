@@ -24,7 +24,8 @@ def print_intrinsic(Hir):
             temp_args.append(BooleanIR(value=is_last))
 
             c_call_node = CallIR(name="_Nida_print_a4", args=temp_args, type=NoneType())
-            c_call_node.imported_func_call = True
+            # c_call_node.imported_func_call = True
+            c_call_node = StmtExprIR(expr=c_call_node)
 
             chunks.append(c_call_node)
             temp_args = []
@@ -41,6 +42,7 @@ def print_intrinsic(Hir):
             type=NoneType(),
         )
         # c_call_node.imported_func_call = True
+        c_call_node = StmtExprIR(expr=c_call_node)
 
         chunks.append(c_call_node)
 

@@ -21,6 +21,7 @@ class IRPasser:
         self.irs = irs
         self.ctx = ctx
         self.generated_functions = {}
+        raise
 
     def run(self):
         final_irs = []

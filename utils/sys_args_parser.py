@@ -169,6 +169,13 @@ class SysArgsClass:
         )
 
         parser.add_argument(
+            "-v",
+            "--verbose-logs",
+            action="store_true",
+            help="Enable verbose output",
+        )
+
+        parser.add_argument(
             "--log-set-sym-attr",
             nargs="+",
             default=[],

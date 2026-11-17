@@ -751,6 +751,12 @@ class IRLowerer:
     def process_PassIR(self, hir):
         pass
 
+    def process_EliminatedIR(self, hir):
+        pass
+
+    def process_StmtExprIR(self, hir):
+        return self.process(hir.expr)
+
     def process(self, hir):
         name = hir.__class__.__name__
         func = getattr(self, f"process_{name}", None)

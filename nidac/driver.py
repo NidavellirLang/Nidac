@@ -162,7 +162,7 @@ class Nidac:
 
         if SysArgs.dump_hir:
             print("===== HIR =====")
-            print(self.hir)
+            print("\n".join(map(str, self.hir)))
 
     def LIRGen(self):
         lir = IRLowerer(self.hir)
