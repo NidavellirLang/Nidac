@@ -180,11 +180,21 @@ class NeLIR(LIR):
 
 
 class CallLIR(LIR):
-    def __init__(self, name, type, func_name, args):
+    def __init__(self, name, type, func_name, args, receiver=None, field=None, func_type=None):
         self.name = name
         self.type = type
         self.func_name = func_name
         self.args = args
+        self.receiver = receiver
+        self.field = field
+        self.func_type = func_type
+
+
+class FunctionRefLIR(LIR):
+    def __init__(self, name, type, func_name):
+        self.name = name
+        self.type = type
+        self.func_name = func_name
 
 
 class ArgLIR(LIR):

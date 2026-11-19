@@ -20,7 +20,7 @@ class IRProcessor:
             raise ValueError("IR generation must run before passes")
 
         manager = build_default() if self.passes is None else PassManager(*self.passes)
-        root = manager.run(BlockIR(body=self.hirs))
+        root = manager.run(BlockIR(body=self.hirs), self.ctx)
 
         self.final_irs = root.body if isinstance(root, BlockIR) else [root]
         return self.final_irs

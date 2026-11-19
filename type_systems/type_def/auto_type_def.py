@@ -93,6 +93,11 @@ class AutoTypeDefEngine:
                             f"Cannot determine type of assigned value {sym}",
                             sym.ast_node.line,
                         )
+
+            if isinstance(sym.type, ClassMethodRefType):
+                with TypeUpdate(sym):
+                    sym.type = BoundMethodType(sym.type)
+
         elif sym.uses:
             deferred = []
             inferred_type = None
@@ -425,9 +430,56 @@ class AutoTypeDefEngine:
             f"Cannot resolve callable target: {target!r}",
         )
 
+    def resolve_bound_callee(self, sym):
+        if sym.field is not None:
+            return None
+
+        current = sym.lookup
+        seen = set()
+
+        while current is not None and id(current) not in seen:
+            seen.add(id(current))
+
+            if isinstance(current, (AssignSymbol, IdentifierSymbol, VariableSymbol)):
+                type = getattr(current, "type", None)
+                if isinstance(type, BoundMethodType):
+                    return type
+
+            current = getattr(current, "value", None) or getattr(
+                current, "lookup", None
+            )
+
+        return None
+
     def process_CallSymbol(self, sym):
         if sym.field is not None:
             self.process(sym.field)
+
+        bound = self.resolve_bound_callee(sym)
+        if bound is not None:
+            fn = bound.ref.lk
+
+            for arg in sym.args:
+                self.process(arg)
+
+            if len(sym.args) != len(fn.args) - 1:
+                raise NidavellirTypeError(
+                    f"Bound call to '{fn.name}' requires {len(fn.args) - 1} "
+                    f"arguments, but {len(sym.args)} were provided",
+                    sym.ast_node.line,
+                )
+
+            calls = self._get_calls_from_value(sym)
+            for call in calls:
+                self._set_arg_uses(fn, call.args, True)
+
+            self._set_arg_uses(fn, sym.args, True)
+            fn.uses.extend(calls)
+
+            self._process_FunctionSymbol(fn)
+            sym.class_ref_type = bound.ref
+            sym.type = fn.type
+            return
 
         target = sym.field if sym.field is not None else sym.lookup
 

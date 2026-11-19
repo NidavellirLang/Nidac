@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, fields, field
 from utils.errors import Line
+from typing import Any
 
 
 @dataclass(slots=True, repr=False, kw_only=True)
@@ -225,9 +226,8 @@ class ListLiteralAST(AST):
 @dataclass(slots=True, repr=False)
 class IntrinsicAST(AST):
     name: str
-    params: list
-    handler: str
-    type: str
+    params: Any
+    type: Any
 
 
 @dataclass(slots=True, repr=False)

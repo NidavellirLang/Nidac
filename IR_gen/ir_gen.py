@@ -83,9 +83,11 @@ class IRGen:
     def _create_class_fields(self, lk):
         fields = []
         for key, val in lk.fields.items():
+            default_ast = getattr(val.ast_node, "value", None)
+
             decl = FieldDeclIR(
                 name=val.name,
-                default=val.value,
+                default=self.gen_expr(default_ast) if default_ast is not None else None,
                 type=val.type,
                 node_id=self.get_id(val),
             )

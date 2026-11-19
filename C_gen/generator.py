@@ -3,7 +3,7 @@ from LIR_gen.lirs import *
 from .c_nodes import *
 from .c_types import *
 from .extra_c_includes import EXTRA_C_INCLUDES
-from type_systems.types import ClassType, RefType
+from type_systems.types import ClassType, FuncPtrType, NoneType, RefType
 
 
 class CExprTranslator:
@@ -54,6 +54,18 @@ class CTypeTranslator:
     def translate(cls, type_name) -> CType:
         if isinstance(type_name, ClassType):
             return CTStruct(type_name.name)
+
+        if isinstance(type_name, NoneType):
+            return CTNone()
+
+        if isinstance(type_name, FuncPtrType):
+            param_types = [cls.translate(param) for param in type_name.params]
+            return_type = (
+                cls.translate(type_name.ret)
+                if type_name.ret is not None
+                else CTVoid()
+            )
+            return CTFuncRef(param_types, return_type)
 
         try:
             return cls.TYPES[type_name]
@@ -108,6 +120,12 @@ class C_Gen:
             body_nodes.append(self.process(b))
 
         return CFunction(name, name, args_nodes, body_nodes, return_type, is_static)
+
+    def process_FunctionRefLIR(self, lir):
+        name = self.name_maper(lir.name)
+        type = CTypeTranslator.translate(lir.type)
+        value = CCast(type, CVariable(lir.func_name))
+        return CAssign(name, value, type)
 
     def process_ConstLIR(self, lir):
         lir_name = self.name_maper(lir.name)
@@ -246,7 +264,14 @@ class C_Gen:
 
     def process_CallLIR(self, lir):
         name = self.name_maper(lir.name)
-        target = lir.func_name
+
+        if lir.field is not None:
+            receiver = self.name_maper(lir.receiver)
+            func_type = CTypeTranslator.translate(lir.func_type)
+            target = f"(({func_type}){receiver}->{lir.field})"
+        else:
+            target = lir.func_name
+
         args = lir.args
 
         args_lirs = []

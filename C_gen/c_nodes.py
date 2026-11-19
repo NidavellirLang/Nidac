@@ -159,6 +159,8 @@ class CArg(CNode):
         self.type = type
 
     def __str__(self):
+        if isinstance(self.type, CTFuncRef):
+            return self.type.declare(self.name)
         return f"{self.type} {self.name}"
 
 
@@ -379,6 +381,8 @@ class CFieldDecl(CNode):
         self.type = type
 
     def __str__(self):
+        if isinstance(self.type, CTFuncRef):
+            return self.type.declare(self.name)
         return f"{self.type} {self.name}"
 
 

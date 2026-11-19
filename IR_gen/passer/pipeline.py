@@ -1,9 +1,11 @@
 from .manager import PassManager
-from .transforms import CollectMain, IntrinsicTransform
+from .transforms import *
 
 DEFAULT_PASSES = (
-    CollectMain,
+    ClassLowering,
+    BoundMethods,
     IntrinsicTransform,
+    CollectMain,
 )
 
 

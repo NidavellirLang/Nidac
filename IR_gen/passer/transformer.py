@@ -47,7 +47,8 @@ class IRTransform:
     revisit = "never"
     max_revisits = 8
 
-    def run(self, node):
+    def run(self, node, ctx=None):
+        self.ctx = ctx
         if self.order not in ("pre", "post"):
             raise PassContractError(
                 f"{type(self).__name__} has invalid order {self.order!r}"

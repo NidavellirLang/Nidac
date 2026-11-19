@@ -16,7 +16,8 @@ from ...irs import (
 class CollectMain(IRTransform):
     module_types = (ClassIR, DefinitionIR, FunctionIR, IRImport, StructIR)
 
-    def run(self, module):
+    def run(self, module, ctx=None):
+        self.ctx = ctx
         if not isinstance(module, BlockIR):
             raise PassContractError(
                 f"{type(self).__name__} expects BlockIR, got {type(module).__name__}"

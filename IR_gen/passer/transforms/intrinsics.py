@@ -8,7 +8,7 @@ class IntrinsicTransform(IRTransform):
         if SysArgs.no_print:
             return []
 
-        SysArgs.add_extra_c_include("print.h")
+        SysArgs.add_extra_c_include("<print.h>")
 
         args = Hir.args
         chunks = [args[i : i + 4] for i in range(0, len(args), 4)]

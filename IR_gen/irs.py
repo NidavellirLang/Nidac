@@ -375,6 +375,8 @@ class BinaryOpIR(ExprIR):
 
 @dataclass(slots=True, kw_only=True, repr=False)
 class VariableIR(ExprIR):
+    __child__ = (Child("receiver", optional=True),)
+
     name: str
     receiver: ExprIR = None
 
@@ -386,12 +388,35 @@ class VariableIR(ExprIR):
 
 
 @dataclass(slots=True, kw_only=True, repr=False)
+class FunctionRefIR(ExprIR):
+    name: str
+
+
+@dataclass(slots=True, kw_only=True, repr=False)
+class BoundMethodIR(ExprIR):
+    __child__ = ("receiver",)
+
+    receiver: ExprIR
+    method: str
+
+
+@dataclass(slots=True, kw_only=True, repr=False)
+class BoundCallIR(ExprIR):
+    __child__ = ("bound", "args")
+
+    bound: ExprIR
+    args: list[ExprIR] = dc_field(default_factory=list)
+    ref: Type = None
+
+
+@dataclass(slots=True, kw_only=True, repr=False)
 class CallIR(ExprIR):
     __child__ = ("target", "args")
 
     target: IdentifierIR | FieldAccessIR
     args: list[ExprIR]
     runtime_call: bool = False
+    indirect: bool = False
 
     # def __init__(self, target, args, type=None, field=None):
     #     self.target = target

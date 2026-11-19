@@ -162,6 +162,15 @@ class IRLowerer:
 
         return lirs
 
+    def process_FunctionRefIR(self, hir):
+        lir = FunctionRefLIR(
+            self.get_value_id(),
+            self.type_of(hir),
+            hir.name,
+        )
+        self.blocks.emit(lir)
+        return lir
+
     def process_NumberIR(self, hir):
         val = hir.value
         types = self.type_of(hir)
@@ -379,11 +388,18 @@ class IRLowerer:
 
         target = hir.target
 
+        receiver = None
+        field = None
+        func_type = None
+
         if isinstance(target, IdentifierIR):
             call_target = target.name
         elif isinstance(target, FieldAccessIR):
-            self.process(target.target)
-            instance_id = self.get_current_value_id()
+            if getattr(hir, "indirect", False):
+                lirs.append(self.process(target.target))
+                receiver = self.get_current_value_id()
+                field = target.field
+                func_type = target.type
             call_target = target.field
         else:
             raise TypeError(f"Invalid call target: {type(target).__name__}")
@@ -409,6 +425,9 @@ class IRLowerer:
             type_str,
             call_target,
             arg_ids,
+            receiver=receiver,
+            field=field,
+            func_type=func_type,
         )
 
         self.blocks.emit(call_lir)
@@ -810,7 +829,7 @@ class IRLowerer:
         return str(type_val)
 
     def type_to_str(self, type_val):
-        if isinstance(type_val, RefType):
+        if isinstance(type_val, (RefType, FuncPtrType)):
             return type_val
 
         if isinstance(type_val, Type):
