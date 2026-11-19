@@ -45,9 +45,15 @@ class BlockManager:
 
     def create_block(self, name=None):
         bname = name if name else f"B{self.block_id.new()}"
+
+        parent_ctx = self.current.block.block_ctx if self.current is not None else None
+
         block = BlockLIR(bname)
+        block.block_ctx = BlockContext(parent=parent_ctx)
+
         box = BlockBox(block, self.current)
         self.blocks.append(box)
+
         return block
 
     def new_block(self, name=None):
@@ -162,6 +168,15 @@ class IRLowerer:
 
         return lirs
 
+    def process_FunctionRefIR(self, hir):
+        lir = FunctionRefLIR(
+            self.get_value_id(),
+            self.type_of(hir),
+            hir.name,
+        )
+        self.blocks.emit(lir)
+        return lir
+
     def process_NumberIR(self, hir):
         val = hir.value
         types = self.type_of(hir)
@@ -200,11 +215,9 @@ class IRLowerer:
     def process_AssignIR(self, hir):
         lirs = LIRs()
 
-        target = hir.name
+        target = hir.target
         value = hir.value
         type_str = self.str_of(hir)
-        is_reassign = hir.re_assign
-        field = hir.field
 
         is_no_value = isinstance(value, NoneIR) and value.air
 
@@ -215,53 +228,44 @@ class IRLowerer:
             value_lirs = self.process(value)
             value_id = self.get_current_value_id()
 
-        if field is not None:
+        if isinstance(target, FieldAccessIR):
             if is_no_value:
-                raise Exception("Cannot assign to member without value")
+                raise ValueError("Cannot assign to member without value")
 
-            if not isinstance(field, FieldAccessIR):
-                raise TypeError(f"Expected FieldAccessIR, got {type(field).__name__}")
-
-            # Evaluate the object that owns the field.
-            self.process(field.target)
+            self.process(target.target)
             base_id = self.get_current_value_id()
 
             member_type = self.type_str_of(
-                self.type_of(field),
+                self.type_of(target),
                 type_str,
             )
 
-            store_lir = FieldStoreLIR(
+            as_lir = FieldStoreLIR(
                 self.get_value_id(),
                 base_id,
-                field.field,
+                target.field,
                 member_type,
                 value_id,
             )
 
-            self.blocks.emit(store_lir)
-            as_lir = store_lir
-
-        elif is_reassign:
-            store_lir = StoreLIR(
-                target,
-                type_str,
-                value_id,
-            )
-
-            self.blocks.emit(store_lir)
-            as_lir = store_lir
+        elif isinstance(target, IdentifierIR):
+            if hir.re_assign:
+                as_lir = StoreLIR(
+                    target.name,
+                    type_str,
+                    value_id,
+                )
+            elif is_no_value:
+                as_lir = DeclareOnlyLIR(target.name, type_str)
+            else:
+                as_lir = DeclareLIR(target.name, type_str, value_id)
 
         else:
-            if is_no_value:
-                declare_lir = DeclareOnlyLIR(target, type_str)
-            else:
-                declare_lir = DeclareLIR(target, type_str, value_id)
+            raise TypeError(f"Unsupported assignment target: {type(target).__name__}")
 
-            self.blocks.emit(declare_lir)
-            as_lir = declare_lir
+        self.blocks.emit(as_lir)
 
-        if not is_no_value:
+        if value_lirs is not None:
             lirs.append(value_lirs)
 
         lirs.append(as_lir)
@@ -316,7 +320,11 @@ class IRLowerer:
         for stmt in body:
             self.process(stmt)
 
-        if self.blocks.current and not self.blocks.is_terminated():
+        if (
+            self.blocks.current
+            and not self.blocks.is_terminated()
+            and isinstance(hir.type, NoneType)
+        ):
             self.blocks.terminate(ReturnLIR(None))
 
         fn_blocks = [box.block for box in self.blocks.blocks]
@@ -370,13 +378,13 @@ class IRLowerer:
         return lirs
 
     def process_CallIR(self, hir):
+        lirs = LIRs()
+        args = hir.args
+
         if getattr(hir, "runtime_call", False):
-            lirs = LIRs()
+            arg_ids = []
 
-            lirs.append(self.process(hir.args[0]))
-            arg_ids = [self.get_current_value_id()]
-
-            for arg in hir.args[1:]:
+            for arg in args:
                 lirs.append(self.process(arg))
                 arg_ids.append(self.get_current_value_id())
 
@@ -386,36 +394,54 @@ class IRLowerer:
                 return_type = "void"
 
             lirs.append(self._runtime_call(hir.target, arg_ids, return_type))
-
             return lirs
 
-        is_not_return = (
-            isinstance(self.type_of(hir), NoneType) or self.type_of(hir) is None
-        )
-        type_str = self.str_of(hir)
-        target = hir.name
-        args = hir.args
+        target = hir.target
 
-        lirs = LIRs()
+        receiver = None
+        field = None
+        func_type = None
+
+        if isinstance(target, IdentifierIR):
+            call_target = target.name
+        elif isinstance(target, FieldAccessIR):
+            if getattr(hir, "indirect", False):
+                lirs.append(self.process(target.target))
+                receiver = self.get_current_value_id()
+                field = target.field
+                func_type = target.type
+            call_target = target.field
+        else:
+            raise TypeError(f"Invalid call target: {type(target).__name__}")
+
         arg_ids = []
 
         for arg in args:
-            lir = self.process(arg)
+            lirs.append(self.process(arg))
             arg_ids.append(self.get_current_value_id())
 
+        type_str = self.str_of(hir)
+        is_not_return = (
+            isinstance(self.type_of(hir), NoneType) or self.type_of(hir) is None
+        )
+
         if is_not_return:
-            nonetype = str(NoneType())
-            const_lir = ConstLIR(self.get_value_id(), nonetype, None)
+            const_lir = ConstLIR(self.get_value_id(), str(NoneType()), None)
             self.blocks.emit(const_lir)
             lirs.append(const_lir)
 
-            call_lir = CallLIR(None, type_str, target, arg_ids)
-        else:
-            call_lir = CallLIR(self.get_value_id(), type_str, target, arg_ids)
+        call_lir = CallLIR(
+            None if is_not_return else self.get_value_id(),
+            type_str,
+            call_target,
+            arg_ids,
+            receiver=receiver,
+            field=field,
+            func_type=func_type,
+        )
 
         self.blocks.emit(call_lir)
         lirs.append(call_lir)
-
         return lirs
 
     def _coerce_numeric(self, value_id, source_type, target_type):
@@ -551,21 +577,20 @@ class IRLowerer:
         self.blocks.jump(cond_block)
 
         self.blocks.switch_to(cond_block)
-
         self.process(hir.cond)
 
         if not is_always_true:
             cond_id = self.get_current_value_id()
-
-            self.blocks.branch(
-                cond_id,
-                loop_block,
-                merge_block,
-            )
+            self.blocks.branch(cond_id, loop_block, merge_block)
         else:
             self.blocks.jump(loop_block)
 
         self.blocks.switch_to(loop_block)
+
+        ctx = self.blocks.current.block.block_ctx
+        ctx.loop_id = hir.node_id
+        ctx.break_target = merge_block
+        ctx.continue_target = cond_block
 
         self.process_from_list(hir.body)
 
@@ -573,6 +598,18 @@ class IRLowerer:
             self.blocks.jump(cond_block)
 
         self.blocks.switch_to(merge_block)
+
+    def process_BreakIR(self, hir):
+        ctx = self.blocks.current.block.block_ctx
+
+        while ctx is not None:
+            if ctx.break_target is not None:
+                self.blocks.jump(ctx.break_target)
+                return
+
+            ctx = ctx.parent
+
+        raise RuntimeError("break outside loop")
 
     def process_ForIR(self, hir):
         # The First block
@@ -751,6 +788,12 @@ class IRLowerer:
     def process_PassIR(self, hir):
         pass
 
+    def process_EliminatedIR(self, hir):
+        pass
+
+    def process_StmtExprIR(self, hir):
+        return self.process(hir.expr)
+
     def process(self, hir):
         name = hir.__class__.__name__
         func = getattr(self, f"process_{name}", None)
@@ -807,7 +850,7 @@ class IRLowerer:
         return str(type_val)
 
     def type_to_str(self, type_val):
-        if isinstance(type_val, RefType):
+        if isinstance(type_val, (RefType, FuncPtrType)):
             return type_val
 
         if isinstance(type_val, Type):

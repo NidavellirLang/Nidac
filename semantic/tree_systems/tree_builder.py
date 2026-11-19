@@ -441,7 +441,8 @@ class SymbolTreeBuilder:
         return sym
 
     # TODO: impl
-    # def stmt_ForAST(self, ast):
+    def stmt_ForAST(self, ast):
+        raise Exception(ast)
 
     def process_branch(self, body, scope_type):
         scope = self.stm.enter_scope(scope_type)
@@ -626,14 +627,14 @@ class SymbolTreeBuilder:
         )
 
     # TODO: impl
-    # def stmt_WhileAST(self, ast):
-    #     cond = ast.cond
-    #     body = ast.body
+    def stmt_WhileAST(self, ast):
+        cond = ast.cond
+        body = ast.body
 
-    #     cond_sym = self.process_eval(cond)
-    #     body_sym = self.process_from_list(body)
+        cond_sym = self.process_eval(cond)
+        body_sym = self.process_from_list(body)
 
-    #     return WhileSymbol(cond_sym, body_sym, ast)
+        return WhileSymbol(cond=cond_sym, body=body_sym, ast_node=ast)
 
     # TODO: impl
     # def stmt_ImportAST(self, ast):
@@ -719,6 +720,18 @@ class SymbolTreeBuilder:
 
     def stmt_FieldAccessAST(self, ast):
         return self.eval_FieldAccessAST(ast)
+
+    def eval_IndexAccessAST(self, ast):
+        target = ast.target
+        index = ast.index
+
+        target_sym = self.process_eval(target)
+        index_sym = self.process_eval(index)
+
+        return IndexAccessSymbol(target=target_sym, index=index_sym, ast_node=ast)
+
+    def stmt_BreakAST(self, ast):
+        return BreakSymbol(ast_node=ast)
 
     def process_eval(self, ast):
         method_name = f"eval_{type(ast).__name__}"

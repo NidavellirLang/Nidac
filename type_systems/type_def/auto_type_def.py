@@ -93,6 +93,11 @@ class AutoTypeDefEngine:
                             f"Cannot determine type of assigned value {sym}",
                             sym.ast_node.line,
                         )
+
+            if isinstance(sym.type, ClassMethodRefType):
+                with TypeUpdate(sym):
+                    sym.type = BoundMethodType(sym.type)
+
         elif sym.uses:
             deferred = []
             inferred_type = None
@@ -238,6 +243,11 @@ class AutoTypeDefEngine:
             offset = getattr(call, "arg_offset", 0)
             for idx, arg in enumerate(call.args):
                 if arg.type is None:
+                    # TODO: Fix this method to support nested referenced function calls.
+                    if isinstance(arg, CallSymbol):
+                        if arg.lookup is sym:
+                            continue
+
                     self.process(arg)
 
                 arg_type = arg.type
@@ -420,9 +430,56 @@ class AutoTypeDefEngine:
             f"Cannot resolve callable target: {target!r}",
         )
 
+    def resolve_bound_callee(self, sym):
+        if sym.field is not None:
+            return None
+
+        current = sym.lookup
+        seen = set()
+
+        while current is not None and id(current) not in seen:
+            seen.add(id(current))
+
+            if isinstance(current, (AssignSymbol, IdentifierSymbol, VariableSymbol)):
+                type = getattr(current, "type", None)
+                if isinstance(type, BoundMethodType):
+                    return type
+
+            current = getattr(current, "value", None) or getattr(
+                current, "lookup", None
+            )
+
+        return None
+
     def process_CallSymbol(self, sym):
         if sym.field is not None:
             self.process(sym.field)
+
+        bound = self.resolve_bound_callee(sym)
+        if bound is not None:
+            fn = bound.ref.lk
+
+            for arg in sym.args:
+                self.process(arg)
+
+            if len(sym.args) != len(fn.args) - 1:
+                raise NidavellirTypeError(
+                    f"Bound call to '{fn.name}' requires {len(fn.args) - 1} "
+                    f"arguments, but {len(sym.args)} were provided",
+                    sym.ast_node.line,
+                )
+
+            calls = self._get_calls_from_value(sym)
+            for call in calls:
+                self._set_arg_uses(fn, call.args, True)
+
+            self._set_arg_uses(fn, sym.args, True)
+            fn.uses.extend(calls)
+
+            self._process_FunctionSymbol(fn)
+            sym.class_ref_type = bound.ref
+            sym.type = fn.type
+            return
 
         target = sym.field if sym.field is not None else sym.lookup
 
@@ -439,13 +496,14 @@ class AutoTypeDefEngine:
             # sym.expr_self_resolve = True
             sym.lookup = fn
             sym.class_ref_type = class_ref
-
             self._process_FunctionSymbol(fn)
 
         elif isinstance(target, FunctionSymbol):
             fn = target
             is_class = False
             is_in_class = sym.field is not None
+            for arg in sym.args:
+                self.process(arg)
             self._process_FunctionSymbol(fn)
 
         else:
@@ -467,6 +525,10 @@ class AutoTypeDefEngine:
             fn.uses.extend(calls)
             # if sym not in fn.uses:
             #     fn.uses.append(sym)
+            for arg in sym.args:
+                self.process(arg)
+            # raise Exception(sym.args)
+
             self._process_FunctionSymbol(fn)
             if sym.field is not None:
                 self.process(sym.field)
@@ -700,6 +762,26 @@ class AutoTypeDefEngine:
         if sym.type is None:
             with TypeUpdate(sym):
                 sym.type = ListType()
+
+    def process_WhileSymbol(self, sym):
+        self.process(sym.cond)
+        self.process_from_list(sym.body)
+
+    def process_BreakSymbol(self, sym):
+        pass
+
+    def process_IndexAccessSymbol(self, sym):
+        self.process(sym.target)
+        self.process(sym.index)
+
+        target_type = sym.target.type
+        if not isinstance(target_type, StringType):
+            raise NidavellirNotImplementedError(
+                f"Indexing is not implemented for types other than `str`.",
+                sym.ast_node.line,
+            )
+
+        sym.type = target_type
 
     def process(self, sym):
         method_name = f"process_{type(sym).__name__}"

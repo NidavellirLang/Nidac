@@ -1,12 +1,12 @@
 from .c_nodes import *
 from .header_nodes import *
-from .extra_c_includes import EXTRA_C_INCLUDES
 
 
 class HeaderGenerator:
-    def __init__(self, header_name, c_code):
+    def __init__(self, header_name, c_code, ctx):
         self.header_name = header_name
         self.c_code = c_code
+        self.ctx = ctx
 
     def gen_CFunction(self, node):
         name = node.name
@@ -26,7 +26,7 @@ class HeaderGenerator:
     def generate_default_header_dependencies(self):
         ifndef = Hifndef(self.header_name)
         includes = [ifndef]
-        for include in EXTRA_C_INCLUDES:
+        for include in self.ctx["extra_c_includes"]:
             name = self.include_name_map(include)
             node = HInclude(name)
             includes.append(node)

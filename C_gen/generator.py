@@ -2,8 +2,7 @@ from IR_gen.irs import *
 from LIR_gen.lirs import *
 from .c_nodes import *
 from .c_types import *
-from .extra_c_includes import EXTRA_C_INCLUDES
-from type_systems.types import ClassType, RefType
+from type_systems.types import ClassType, FuncPtrType, NoneType, RefType
 
 
 class CExprTranslator:
@@ -55,6 +54,16 @@ class CTypeTranslator:
         if isinstance(type_name, ClassType):
             return CTStruct(type_name.name)
 
+        if isinstance(type_name, NoneType):
+            return CTNone()
+
+        if isinstance(type_name, FuncPtrType):
+            param_types = [cls.translate(param) for param in type_name.params]
+            return_type = (
+                cls.translate(type_name.ret) if type_name.ret is not None else CTVoid()
+            )
+            return CTFuncRef(param_types, return_type)
+
         try:
             return cls.TYPES[type_name]
         except Exception:
@@ -64,8 +73,8 @@ class CTypeTranslator:
             if isinstance(type_name, RefType):
                 param_types, return_type = type_name.get_types()
 
-                param_c_types = [CTypeTranslator.translate(p) for p in param_types]
-                return_c_type = CTypeTranslator.translate(return_type)
+                param_c_types = [cls.translate_type(p) for p in param_types]
+                return_c_type = cls.translate_type(return_type)
                 return CTFuncRef(param_c_types, return_c_type)
 
             raise Exception(
@@ -74,10 +83,10 @@ class CTypeTranslator:
 
 
 class C_Gen:
-    def __init__(self, LIRs, extra_include=[]):
+    def __init__(self, LIRs, ctx):
         self.LIRs = LIRs
-        self.extra_include = extra_include
         self.c_nodes = []
+        self.ctx = ctx
 
     def name_maper(self, name):
         if name is None:
@@ -87,9 +96,23 @@ class C_Gen:
             name = "v" + name[1:]
         return name
 
+    def translate_type(self, nida_type) -> CType:
+        c_type = CTypeTranslator.translate(nida_type)
+
+        for header in c_type.required_headers():
+            self.ctx.add_c_header(header)
+
+        for source in c_type.required_sources():
+            name = source
+            runtime_path = self.ctx["runtime_path"]
+            c_file_path = Path(runtime_path) / name
+            self.ctx.add_c_source(c_file_path)
+
+        return c_type
+
     def process_ArgLIR(self, lir):
         name = self.name_maper(lir.name)
-        type = CTypeTranslator.translate(lir.type)
+        type = self.translate_type(lir.type)
         return CArg(name, type)
 
     def process_FunctionLIR(self, lir):
@@ -97,7 +120,7 @@ class C_Gen:
         args = lir.args
         body = lir.body
         is_static = lir.is_static
-        return_type = CTypeTranslator.translate(lir.type)
+        return_type = self.translate_type(lir.type)
 
         args_nodes = []
         for arg in args:
@@ -109,6 +132,12 @@ class C_Gen:
 
         return CFunction(name, name, args_nodes, body_nodes, return_type, is_static)
 
+    def process_FunctionRefLIR(self, lir):
+        name = self.name_maper(lir.name)
+        type = self.translate_type(lir.type)
+        value = CCast(type, CVariable(lir.func_name))
+        return CAssign(name, value, type)
+
     def process_ConstLIR(self, lir):
         lir_name = self.name_maper(lir.name)
         if lir.value is None:
@@ -116,7 +145,7 @@ class C_Gen:
         else:
             val = CExprTranslator.translate(lir.value)
 
-        type = CTypeTranslator.translate(lir.type)
+        type = self.translate_type(lir.type)
         if isinstance(type, CTString):
             val = CCall("Nida_str_new", [val])
 
@@ -153,7 +182,7 @@ class C_Gen:
 
     def _bin_ops(self, lir):
         name = self.name_maper(lir.name)
-        type = CTypeTranslator.translate(lir.type)
+        type = self.translate_type(lir.type)
         left = lir.left_id
         right = lir.right_id
 
@@ -203,27 +232,27 @@ class C_Gen:
 
     def process_DeclareLIR(self, lir):
         name = lir.name
-        type = CTypeTranslator.translate(lir.type)
+        type = self.translate_type(lir.type)
         val_name = self.name_maper(lir.value)
         value = CVariable(val_name)
         return CAssign(name, value, type)
 
     def process_DeclareOnlyLIR(self, lir):
         name = lir.name
-        type = CTypeTranslator.translate(lir.type)
+        type = self.translate_type(lir.type)
         value = CNone(is_str=False)
         return CAssign(name, value, type)
 
     def process_StoreLIR(self, lir):
         name = lir.name
-        type = CTypeTranslator.translate(lir.type)
+        type = self.translate_type(lir.type)
         val_name = self.name_maper(lir.value)
         value = CVariable(val_name)
         return CAssign(name, value, type, re_assign=True)
 
     def process_CastLIR(self, lir):
         name = self.name_maper(lir.name)
-        target_type = CTypeTranslator.translate(lir.target_type)
+        target_type = self.translate_type(lir.target_type)
         value_name = self.name_maper(lir.value)
 
         cast = CCast(target_type, CVariable(value_name))
@@ -242,11 +271,18 @@ class C_Gen:
         name = self.name_maper(lir.name)
         var_name = self.name_maper(lir.var_name)
         var = CVariable(var_name)
-        return CAssign(name, var, CTypeTranslator.translate(lir.type))
+        return CAssign(name, var, self.translate_type(lir.type))
 
     def process_CallLIR(self, lir):
         name = self.name_maper(lir.name)
-        target = lir.func_name
+
+        if lir.field is not None:
+            receiver = self.name_maper(lir.receiver)
+            func_type = self.translate_type(lir.func_type)
+            target = f"(({func_type}){receiver}->{lir.field})"
+        else:
+            target = lir.func_name
+
         args = lir.args
 
         args_lirs = []
@@ -258,7 +294,7 @@ class C_Gen:
         if name is None:
             return call
         else:
-            assign = CAssign(name, call, CTypeTranslator.translate(lir.type))
+            assign = CAssign(name, call, self.translate_type(lir.type))
             return assign
 
     def process_BlockLIR(self, lir):
@@ -286,15 +322,13 @@ class C_Gen:
 
     def process_GlobalLIR(self, lir):
         name = lir.name
-        type = CTypeTranslator.translate(lir.type)
+        type = self.translate_type(lir.type)
         initializer = lir.initializer
 
         return CGlobal(name, type, initializer)
 
     def process_StructLIR(self, lir):
-        fields = [
-            CFieldDecl(f.name, CTypeTranslator.translate(f.type)) for f in lir.fields
-        ]
+        fields = [CFieldDecl(f.name, self.translate_type(f.type)) for f in lir.fields]
 
         return CStruct(lir.name, fields)
 
@@ -311,7 +345,7 @@ class C_Gen:
         return CAssign(
             self.name_maper(lir.name),
             access,
-            CTypeTranslator.translate(lir.type),
+            self.translate_type(lir.type),
         )
 
     def process_FieldStoreLIR(self, lir):
@@ -324,12 +358,12 @@ class C_Gen:
         return CAssign(
             self.name_maper(lir.name),
             CNew(lir.class_name),
-            CTypeTranslator.translate(lir.type),
+            self.translate_type(lir.type),
         )
 
     def process_UnaryOpLIR(self, lir):
         name = self.name_maper(lir.name)
-        type = CTypeTranslator.translate(lir.type)
+        type = self.translate_type(lir.type)
 
         val_name = self.name_maper(lir.value)
 
@@ -359,13 +393,8 @@ class C_Gen:
                 body_code += ";\n" + c_node.str()
 
         includes = ["#include <Nida_core.h>"]
-        for include in EXTRA_C_INCLUDES:
+        for include in self.ctx["c_headers"]:
             includes.append(f"#include {self.include_name_map(include)}")
-
-        for include in self.extra_include:
-            incl = f"#include {self.include_name_map(include)}"
-            if incl not in includes:
-                includes.append(incl)
 
         return "\n".join(includes) + "\n" + body_code
 

@@ -1,10 +1,22 @@
-from dataclasses import dataclass, fields as dc_fields, field as dc_field, is_dataclass
+from dataclasses import dataclass, field as dc_field
 from type_systems.types import *
-from typing import Any
+from typing import Any, ClassVar
+
+from utils.tree_utils import TreeReprMixin, _paint, _YELLOW
+
+
+@dataclass(frozen=True, slots=True)
+class Child:
+    name: str
+    optional: bool = False
 
 
 @dataclass(slots=True, kw_only=True, repr=False)
-class IR:
+class IR(TreeReprMixin):
+    __child__: ClassVar[tuple[str | Child, ...]] = ()
+
+    _tree_skip_fields = ("node_id",)
+
     node_id: int = None
     type: Type = None
 
@@ -13,112 +25,15 @@ class IR:
         return any(cls.__name__.endswith("Symbol") for cls in type(value).__mro__)
 
     @classmethod
-    def _format_value(cls, value: Any) -> str:
-        if value is None:
-            return "None"
+    def _tree_is_node(cls, value: Any) -> bool:
+        return isinstance(value, IR)
 
+    @classmethod
+    def _tree_format_value(cls, value: Any) -> str:
         if cls._is_symbol(value):
-            return f"<NidaSym: {type(value).__name__}>"
+            return _paint(f"<NidaSym: {type(value).__name__}>", _YELLOW)
 
-        if isinstance(value, IR):
-            return f"<{type(value).__name__}>"
-
-        if isinstance(value, list):
-            return "[" + ", ".join(cls._format_value(item) for item in value) + "]"
-
-        if isinstance(value, tuple):
-            content = ", ".join(cls._format_value(item) for item in value)
-            if len(value) == 1:
-                content += ","
-            return f"({content})"
-
-        if isinstance(value, dict):
-            return (
-                "{"
-                + ", ".join(
-                    f"{cls._format_value(k)}: {cls._format_value(v)}"
-                    for k, v in value.items()
-                )
-                + "}"
-            )
-
-        return repr(value)
-
-    def tree_repr(self, indent="", is_last=True):
-        marker = "└── " if is_last else "├── "
-        name = type(self).__name__
-
-        fields = [
-            field
-            for field in dc_fields(self)
-            if field.repr
-            and field.name != "node_id"
-            and not (field.name == "decs" and not getattr(self, field.name))
-        ]
-
-        # Leaf node: compact representation.
-        if not any(
-            isinstance(getattr(self, field.name), IR)
-            or (
-                isinstance(getattr(self, field.name), (list, tuple))
-                and any(isinstance(item, IR) for item in getattr(self, field.name))
-            )
-            for field in fields
-        ):
-            args = ", ".join(
-                f"{field.name}={self._format_value(getattr(self, field.name))}"
-                for field in fields
-            )
-            return f"{indent}{marker}{name}({args})"
-
-        lines = [f"{indent}{marker}{name}"]
-        child_indent = indent + ("    " if is_last else "│   ")
-
-        for i, field in enumerate(fields):
-            value = getattr(self, field.name)
-            last = i == len(fields) - 1
-
-            if value is None:
-                continue
-
-            c_marker = "└── " if last else "├── "
-
-            if isinstance(value, IR):
-                lines.append(f"{child_indent}{c_marker}{field.name}:")
-                lines.append(
-                    value.tree_repr(
-                        child_indent + ("    " if last else "│   "),
-                        True,
-                    )
-                )
-
-            elif isinstance(value, (list, tuple)) and any(
-                isinstance(item, IR) for item in value
-            ):
-                lines.append(f"{child_indent}{c_marker}{field.name}:")
-                list_indent = child_indent + ("    " if last else "│   ")
-
-                for j, item in enumerate(value):
-                    item_last = j == len(value) - 1
-
-                    if isinstance(item, IR):
-                        lines.append(item.tree_repr(list_indent, item_last))
-                    else:
-                        item_marker = "└── " if item_last else "├── "
-                        lines.append(
-                            f"{list_indent}{item_marker}" f"{self._format_value(item)}"
-                        )
-
-            else:
-                lines.append(
-                    f"{child_indent}{c_marker}{field.name}: "
-                    f"{self._format_value(value)}"
-                )
-
-        return "\n".join(lines)
-
-    def __repr__(self):
-        return self.tree_repr()
+        return TreeReprMixin._tree_format_value(value)
 
 
 @dataclass(slots=True, kw_only=True, repr=False)
@@ -129,6 +44,24 @@ class StmtIR(IR):
 @dataclass(slots=True, kw_only=True, repr=False)
 class ExprIR(IR):
     pass
+
+
+@dataclass(slots=True, kw_only=True, repr=False)
+class ParameterIR(IR):
+    __child__ = (Child("default", optional=True),)
+
+    name: str
+    type: Type
+    default: ExprIR = None
+
+
+@dataclass(slots=True, kw_only=True, repr=False)
+class FieldDeclIR(IR):
+    __child__ = (Child("default", optional=True),)
+
+    name: str
+    type: Type
+    default: ExprIR | None = None
 
 
 # ---------------------
@@ -142,11 +75,22 @@ class PassIR(StmtIR):
 
 
 @dataclass(slots=True, kw_only=True, repr=False)
+class EliminatedIR(StmtIR):
+    pass
+
+
+class BreakIR(StmtIR):
+    pass
+
+
+@dataclass(slots=True, kw_only=True, repr=False)
 class AssignIR(StmtIR):
-    name: str
+    __child__ = ("value", "target")
+
+    target: IdentifierIR | FieldAccessIR
     value: ExprIR = None
-    re_assign: StmtIR = None
-    field: ExprIR = None
+    re_assign: bool = False
+
     # def __init__(
     #     self,
     #     target,
@@ -165,8 +109,10 @@ class AssignIR(StmtIR):
 
 @dataclass(slots=True, kw_only=True, repr=False)
 class FunctionIR(StmtIR):
+    __child__ = ("args", "body", "decorators")
+
     name: str
-    args: list[AssignIR | SelfBoxIR] = dc_field(default_factory=list)
+    args: list[AssignIR] = dc_field(default_factory=list)
     body: list[StmtIR] = dc_field(default_factory=list)
     is_main_func: bool = False
     is_static: bool = False
@@ -201,6 +147,8 @@ class FunctionIR(StmtIR):
 
 @dataclass(slots=True, kw_only=True, repr=False)
 class ReturnIR(StmtIR):
+    __child__ = ("value",)
+
     value: ExprIR
 
     # def __init__(self, value, type=None):
@@ -210,6 +158,8 @@ class ReturnIR(StmtIR):
 
 @dataclass(slots=True, kw_only=True, repr=False)
 class ClassIR(StmtIR):
+    __child__ = ("body", "fields")
+
     name: str
     body: list[StmtIR] = dc_field(default_factory=list)
     fields: list[tuple] = dc_field(default_factory=list)
@@ -241,6 +191,8 @@ class IRImport(StmtIR):
 
 @dataclass(slots=True, kw_only=True, repr=False)
 class IfIR(StmtIR):
+    __child__ = ("cond", "body", "elifs", Child("else_body", optional=True))
+
     cond: ExprIR
     body: list[StmtIR] = dc_field(default_factory=list)
     elifs: list[ElifIR] = dc_field(default_factory=list)
@@ -257,6 +209,8 @@ class IfIR(StmtIR):
 
 @dataclass(slots=True, kw_only=True, repr=False)
 class ElifIR(StmtIR):
+    __child__ = ("cond", "body")
+
     cond: ExprIR
     body: list[StmtIR] = dc_field(default_factory=list)
     # def __init__(self, cond, body):
@@ -266,6 +220,8 @@ class ElifIR(StmtIR):
 
 @dataclass(slots=True, kw_only=True, repr=False)
 class BlockIR(StmtIR):
+    __child__ = ("body",)
+
     body: list[StmtIR] = dc_field(default_factory=list)
     # def __init__(self, body):
     #     self.body = body
@@ -273,6 +229,8 @@ class BlockIR(StmtIR):
 
 @dataclass(slots=True, kw_only=True, repr=False)
 class ForIR(StmtIR):
+    __child__ = ("source", "body")
+
     target: str
     source: ExprIR
     body: list[StmtIR] = dc_field(default_factory=list)
@@ -284,6 +242,8 @@ class ForIR(StmtIR):
 
 @dataclass(slots=True, kw_only=True, repr=False)
 class WhileIR(StmtIR):
+    __child__ = ("cond", "body")
+
     cond: ExprIR
     body: list[StmtIR] = dc_field(default_factory=list)
     # def __init__(self, cond, body):
@@ -293,6 +253,8 @@ class WhileIR(StmtIR):
 
 @dataclass(slots=True, kw_only=True, repr=False)
 class DefinitionIR(StmtIR):
+    __child__ = (Child("value", optional=True),)
+
     name: str
     value: ExprIR = None
     initializer: StmtIR = None
@@ -307,6 +269,8 @@ class DefinitionIR(StmtIR):
 
 @dataclass(slots=True, kw_only=True, repr=False)  # only use for ir_passer
 class StructIR(StmtIR):
+    __child__ = ("fields", Child("initialize_function", optional=True))
+
     name: str
     fields: list[AssignIR] = dc_field(default_factory=list)
     class_fields: list[tuple] = dc_field(default_factory=list)
@@ -319,6 +283,13 @@ class StructIR(StmtIR):
     #     self.class_fields = class_fields or []
 
     #     self.initialize_function = None
+
+
+@dataclass(slots=True, kw_only=True, repr=False)
+class StmtExprIR(StmtIR):
+    __child__ = ("expr",)
+
+    expr: ExprIR
 
 
 # ---------------------
@@ -352,8 +323,10 @@ class NoneIR(ExprIR):
 
 @dataclass(slots=True, kw_only=True, repr=False)
 class IntrinsicCallIR(ExprIR):
+    __child__ = ("target", "args")
+
     intrinsic: Any
-    name: str
+    target: IdentifierIR | FieldAccessIR
     args: list[ExprIR]
 
     # def __init__(self, intrinsic, name, args, type):
@@ -372,6 +345,8 @@ class BooleanIR(ExprIR):
 
 @dataclass(slots=True, kw_only=True, repr=False)
 class GroupIR(ExprIR):
+    __child__ = ("expr",)
+
     expr: ExprIR
     # def __init__(self, expr):
     #     self.expr = expr
@@ -390,6 +365,8 @@ class NewIR(ExprIR):
 
 @dataclass(slots=True, kw_only=True, repr=False)
 class BinaryOpIR(ExprIR):
+    __child__ = ("left", "right")
+
     left: ExprIR
     right: ExprIR
     op: str
@@ -402,6 +379,8 @@ class BinaryOpIR(ExprIR):
 
 @dataclass(slots=True, kw_only=True, repr=False)
 class VariableIR(ExprIR):
+    __child__ = (Child("receiver", optional=True),)
+
     name: str
     receiver: ExprIR = None
 
@@ -413,11 +392,35 @@ class VariableIR(ExprIR):
 
 
 @dataclass(slots=True, kw_only=True, repr=False)
-class CallIR(ExprIR):
+class FunctionRefIR(ExprIR):
     name: str
+
+
+@dataclass(slots=True, kw_only=True, repr=False)
+class BoundMethodIR(ExprIR):
+    __child__ = ("receiver",)
+
+    receiver: ExprIR
+    method: str
+
+
+@dataclass(slots=True, kw_only=True, repr=False)
+class BoundCallIR(ExprIR):
+    __child__ = ("bound", "args")
+
+    bound: ExprIR
+    args: list[ExprIR] = dc_field(default_factory=list)
+    ref: Type = None
+
+
+@dataclass(slots=True, kw_only=True, repr=False)
+class CallIR(ExprIR):
+    __child__ = ("target", "args")
+
+    target: IdentifierIR | FieldAccessIR
     args: list[ExprIR]
-    field: ExprIR = None
     runtime_call: bool = False
+    indirect: bool = False
 
     # def __init__(self, target, args, type=None, field=None):
     #     self.target = target
@@ -441,6 +444,8 @@ class NumberIR(ExprIR):
 
 @dataclass(slots=True, kw_only=True, repr=False)
 class FieldAccessIR(ExprIR):
+    __child__ = ("target",)
+
     target: ExprIR
     field: str
 
@@ -452,6 +457,8 @@ class FieldAccessIR(ExprIR):
 
 @dataclass(slots=True, kw_only=True, repr=False)
 class UnaryOpIR(ExprIR):
+    __child__ = ("value",)
+
     value: ExprIR
     op: str
 
@@ -478,7 +485,8 @@ class IdentifierIR(ExprIR):
 
 
 @dataclass(slots=True, kw_only=True, repr=False)
-class SelfBoxIR(ExprIR):
-    ir: ExprIR
-    # def __init__(self, ir):
-    #     self.ir = ir
+class IndexAccessIR(ExprIR):
+    __child__ = ("target", "index")
+
+    target: VariableIR
+    index: ExprIR

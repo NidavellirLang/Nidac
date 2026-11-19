@@ -306,7 +306,9 @@ class Parser:
                 end_token = self.current
                 self.consume("RBRACKET")
                 line = self._span_line(
-                    left.line, self._make_line(index_expr.line or end_token), end_token
+                    left.line,
+                    index_expr.line or self._make_line(end_token),
+                    end_token,
                 )
                 left = IndexAccessAST(
                     target=left,
@@ -1217,16 +1219,19 @@ class Parser:
             line = self._make_line(token)
             return StringAST(value=token[1], line=line, node_id=self.id_alloc.alloc())
 
+        if kind == "BREAK":
+            token = self.advance()
+            line = self._make_line(token)
+            return BreakAST(line=line, node_id=self.id_alloc.alloc())
+
         if kind == "PASS":
             token = self.advance()
             line = self._make_line(token)
             return PassAST(line=line, node_id=self.id_alloc.alloc())
 
         if kind == "LPAREN":
-            start_token = self.current
             self.advance()
             expr = self.parse_kind(self.peek_kind())
-            end_token = self.current
             self.consume("RPAREN")
             return expr
 

@@ -274,6 +274,24 @@ class FuncRefType(RefType):
         super().__init__(lk)
 
 
+class FuncPtrType(Type):
+    def __init__(self, params=(), ret=None):
+        self.params = list(params)
+        self.ret = ret
+
+    def __str__(self):
+        params = ", ".join(str(param) for param in self.params)
+        return f"funcptr({params}) -> {self.ret}"
+
+
+class BoundMethodType(Type):
+    def __init__(self, ref):
+        self.ref = ref
+
+    def __str__(self):
+        return f"BoundMethod[{self.ref}]"
+
+
 class ClassMethodRefType(RefType):
     def __init__(self, lk, instance_lk):
         super().__init__(lk)

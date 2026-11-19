@@ -1,5 +1,5 @@
-from .extra_c_includes import EXTRA_C_INCLUDES
 from type_systems.types import Infinity
+from pathlib import Path
 
 
 class CType:
@@ -8,6 +8,12 @@ class CType:
 
     def str(self):
         return str(self)
+
+    def required_headers(self) -> set[str]:
+        return set()
+
+    def required_sources(self) -> set[Path]:
+        return set()
 
 
 class CTVoid(CType):
@@ -25,28 +31,24 @@ class CTInt(CType):
         self.signed = signed
         self.byte_size = byte_size
 
+    def required_headers(self):
+        if self.byte_size in (1, 2, 4, 8):
+            return {"<stdint.h>"}
+        return set()
+
     def __str__(self):
         if self.byte_size is None:
             return "int"
 
-        if "<stdint.h>" not in EXTRA_C_INCLUDES:
-            EXTRA_C_INCLUDES.append("<stdint.h>")
-
-        int_str = "uint" if not self.signed else "int"
+        int_str = "int" if self.signed else "uint"
 
         if self.byte_size == Infinity:
-            return f"idyn"
+            return "idyn"
 
-        if self.byte_size == 1:
-            return f"{int_str}8_t"
-        elif self.byte_size == 2:
-            return f"{int_str}16_t"
-        elif self.byte_size == 4:
-            return f"{int_str}32_t"
-        elif self.byte_size == 8:
-            return f"{int_str}64_t"
-        else:
-            raise Exception("Invalid byte size")
+        if self.byte_size in (1, 2, 4, 8):
+            return f"{int_str}{self.byte_size * 8}_t"
+
+        raise ValueError(f"Invalid integer byte size: {self.byte_size}")
 
 
 class CTFloat(CType):
@@ -54,18 +56,20 @@ class CTFloat(CType):
         self.byte_size = byte_size
 
     def __str__(self):
-        if self.byte_size is None:
+        if self.byte_size is None or self.byte_size == 4:
             return "float"
-
-        if self.byte_size == 4:
-            return "float"
-        elif self.byte_size == 8:
+        if self.byte_size == 8:
             return "double"
-        else:
-            raise Exception("Invalid byte size")
+        raise ValueError(f"Invalid float byte size: {self.byte_size}")
 
 
 class CTString(CType):
+    def required_headers(self):
+        return {'"Nida_str.h"'}
+
+    def required_sources(self) -> set[Path]:
+        return {"Nida_str.c"}
+
     def __str__(self):
         return "Nida_Str"
 
@@ -84,10 +88,15 @@ class CTList(CType):
     def __init__(self, element_type=None):
         self.element_type = element_type
 
-    def __str__(self):
-        if "dynix_nida.h" not in EXTRA_C_INCLUDES:
-            EXTRA_C_INCLUDES.append("dynix_nida.h")
+    def required_headers(self):
+        headers = {'"dynix_nida.h"'}
 
+        if self.element_type is not None:
+            headers.update(self.element_type.required_headers())
+
+        return headers
+
+    def __str__(self):
         return "Nida_List *"
 
 
@@ -95,6 +104,14 @@ class CTFuncRef(CType):
     def __init__(self, param_types, return_type):
         self.param_types = param_types
         self.return_type = return_type
+
+    def required_headers(self):
+        headers = self.return_type.required_headers()
+
+        for param_type in self.param_types:
+            headers.update(param_type.required_headers())
+
+        return headers
 
     def declare(self, name):
         params = ", ".join(str(t) for t in self.param_types) or "void"
