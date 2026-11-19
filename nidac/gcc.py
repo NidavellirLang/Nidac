@@ -4,10 +4,14 @@ from utils import SysArgs
 from utils.errors import *
 
 
-def compile_c_file(c_path: str | Path, output_path: str | Path) -> bool:
-    runtime_path = Path(__file__).parent.parent / "runtime"
-    gcc_include_flags = [f"-I{p}" for p in SysArgs.include_paths]
-    extra_c_sources = [str(f) for f in SysArgs.extra_c_files]
+def compile_c_file(c_path: str | Path, output_path: str | Path, ctx) -> bool:
+    runtime_path = ctx["runtime_path"]
+
+    gcc_include_flags = [
+        f"-I{p}" for p in (*SysArgs.include_paths, *ctx["include_paths"])
+    ]
+
+    extra_c_sources = [str(f) for f in (*SysArgs.extra_c_files, *ctx["c_sources"])]
 
     cmd = [
         "gcc",
@@ -20,7 +24,7 @@ def compile_c_file(c_path: str | Path, output_path: str | Path) -> bool:
         "-fdiagnostics-color=always",
         f"-I{runtime_path}",
         *gcc_include_flags,
-    ]  # TODO: add custom gcc flags
+    ]
 
     if SysArgs.verbose_errors:
         print(f"Compiling cmd: {' '.join(cmd)}")

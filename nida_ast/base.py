@@ -257,3 +257,7 @@ class NoneAST(AST):
 @dataclass(slots=True)
 class IdentifierAST(AST):
     name: str
+
+
+class BreakAST(AST):
+    pass

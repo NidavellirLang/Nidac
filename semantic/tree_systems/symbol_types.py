@@ -397,7 +397,9 @@ class ElifSymbol(Symbol):
 
 @dataclass(slots=True, repr=False)
 class WhileSymbol(Symbol):
-    pass
+    cond: Symbol
+    body: list[Symbol] = dc_field(default_factory=list)
+
     # TODO: impl
     # def __init__(self, cond, body, ast_node):
     #     self.cond = cond
@@ -470,3 +472,14 @@ class IdentifierSymbol(Symbol):
     name: str
     lookup: Symbol | None = None
     resolve_name: str | None = None
+
+
+@dataclass(slots=True, repr=False)
+class BreakSymbol(Symbol):
+    pass
+
+
+@dataclass(slots=True, repr=False)
+class IndexAccessSymbol(Symbol):
+    target: VariableSymbol
+    index: Symbol

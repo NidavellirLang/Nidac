@@ -763,6 +763,26 @@ class AutoTypeDefEngine:
             with TypeUpdate(sym):
                 sym.type = ListType()
 
+    def process_WhileSymbol(self, sym):
+        self.process(sym.cond)
+        self.process_from_list(sym.body)
+
+    def process_BreakSymbol(self, sym):
+        pass
+
+    def process_IndexAccessSymbol(self, sym):
+        self.process(sym.target)
+        self.process(sym.index)
+
+        target_type = sym.target.type
+        if not isinstance(target_type, StringType):
+            raise NidavellirNotImplementedError(
+                f"Indexing is not implemented for types other than `str`.",
+                sym.ast_node.line,
+            )
+
+        sym.type = target_type
+
     def process(self, sym):
         method_name = f"process_{type(sym).__name__}"
         visitor = getattr(self, method_name, None)

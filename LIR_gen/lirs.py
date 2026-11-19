@@ -180,7 +180,9 @@ class NeLIR(LIR):
 
 
 class CallLIR(LIR):
-    def __init__(self, name, type, func_name, args, receiver=None, field=None, func_type=None):
+    def __init__(
+        self, name, type, func_name, args, receiver=None, field=None, func_type=None
+    ):
         self.name = name
         self.type = type
         self.func_name = func_name
@@ -203,11 +205,22 @@ class ArgLIR(LIR):
         self.type = type
 
 
+class BlockContext:
+    def __init__(
+        self, loop_id=None, break_target=None, continue_target=None, parent=None
+    ):
+        self.loop_id = loop_id
+        self.break_target = break_target
+        self.continue_target = continue_target
+        self.parent = parent
+
+
 class BlockLIR(LIR):
-    def __init__(self, name):
+    def __init__(self, name, block_ctx=None):
         self.name = name
         self.body = []
         self.terminator = None
+        self.block_ctx = block_ctx
 
 
 class JumpLIR(LIR):

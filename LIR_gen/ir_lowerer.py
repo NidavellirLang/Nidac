@@ -45,9 +45,15 @@ class BlockManager:
 
     def create_block(self, name=None):
         bname = name if name else f"B{self.block_id.new()}"
+
+        parent_ctx = self.current.block.block_ctx if self.current is not None else None
+
         block = BlockLIR(bname)
+        block.block_ctx = BlockContext(parent=parent_ctx)
+
         box = BlockBox(block, self.current)
         self.blocks.append(box)
+
         return block
 
     def new_block(self, name=None):
@@ -314,7 +320,11 @@ class IRLowerer:
         for stmt in body:
             self.process(stmt)
 
-        if self.blocks.current and not self.blocks.is_terminated():
+        if (
+            self.blocks.current
+            and not self.blocks.is_terminated()
+            and isinstance(hir.type, NoneType)
+        ):
             self.blocks.terminate(ReturnLIR(None))
 
         fn_blocks = [box.block for box in self.blocks.blocks]
@@ -567,21 +577,20 @@ class IRLowerer:
         self.blocks.jump(cond_block)
 
         self.blocks.switch_to(cond_block)
-
         self.process(hir.cond)
 
         if not is_always_true:
             cond_id = self.get_current_value_id()
-
-            self.blocks.branch(
-                cond_id,
-                loop_block,
-                merge_block,
-            )
+            self.blocks.branch(cond_id, loop_block, merge_block)
         else:
             self.blocks.jump(loop_block)
 
         self.blocks.switch_to(loop_block)
+
+        ctx = self.blocks.current.block.block_ctx
+        ctx.loop_id = hir.node_id
+        ctx.break_target = merge_block
+        ctx.continue_target = cond_block
 
         self.process_from_list(hir.body)
 
@@ -589,6 +598,18 @@ class IRLowerer:
             self.blocks.jump(cond_block)
 
         self.blocks.switch_to(merge_block)
+
+    def process_BreakIR(self, hir):
+        ctx = self.blocks.current.block.block_ctx
+
+        while ctx is not None:
+            if ctx.break_target is not None:
+                self.blocks.jump(ctx.break_target)
+                return
+
+            ctx = ctx.parent
+
+        raise RuntimeError("break outside loop")
 
     def process_ForIR(self, hir):
         # The First block

@@ -46,6 +46,10 @@ class IRTransform:
     order = "post"
     revisit = "never"
     max_revisits = 8
+    targets = ()
+
+    def matches(self, node):
+        return not self.targets or isinstance(node, self.targets)
 
     def run(self, node, ctx=None):
         self.ctx = ctx
@@ -74,6 +78,9 @@ class IRTransform:
         return node
 
     def _settle(self, node, budget):
+        if not self.matches(node):
+            return node
+
         original = node
         result = self.visit(node)
 
@@ -97,6 +104,8 @@ class IRTransform:
                 )
 
             original = result
+            if not self.matches(result):
+                return result
             result = self.visit(result)
             budget -= 1
 

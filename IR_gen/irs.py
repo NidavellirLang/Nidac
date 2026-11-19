@@ -79,6 +79,10 @@ class EliminatedIR(StmtIR):
     pass
 
 
+class BreakIR(StmtIR):
+    pass
+
+
 @dataclass(slots=True, kw_only=True, repr=False)
 class AssignIR(StmtIR):
     __child__ = ("value", "target")
@@ -478,3 +482,11 @@ class IdentifierIR(ExprIR):
     name: str
     # def __init__(self, name):
     #     self.name = name
+
+
+@dataclass(slots=True, kw_only=True, repr=False)
+class IndexAccessIR(ExprIR):
+    __child__ = ("target", "index")
+
+    target: VariableIR
+    index: ExprIR

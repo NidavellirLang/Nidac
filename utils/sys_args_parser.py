@@ -204,21 +204,21 @@ class SysArgsClass:
         self.__dict__.update(vars(parsed))
         self.extra_c_includes = []
 
-    def add_include_path(self, path: Path | str) -> None:
-        path_obj = Path(path).resolve()
+    # def add_include_path(self, path: Path | str) -> None:
+    #     path_obj = Path(path).resolve()
 
-        if path_obj not in self.include_paths:
-            self.include_paths.append(path_obj)
+    #     if path_obj not in self.include_paths:
+    #         self.include_paths.append(path_obj)
 
-    def add_c_file(self, path: Path | str) -> None:
-        path_obj = Path(path).resolve()
+    # def add_c_file(self, path: Path | str) -> None:
+    #     path_obj = Path(path).resolve()
 
-        if path_obj not in self.extra_c_files:
-            self.extra_c_files.append(path_obj)
+    #     if path_obj not in self.extra_c_files:
+    #         self.extra_c_files.append(path_obj)
 
-    def add_extra_c_include(self, name: str) -> None:
-        if name not in self.extra_c_includes:
-            self.extra_c_includes.append(name)
+    # def add_extra_c_include(self, name: str) -> None:
+    #     if name not in self.extra_c_includes:
+    #         self.extra_c_includes.append(name)
 
 
 SysArgs = SysArgsClass()

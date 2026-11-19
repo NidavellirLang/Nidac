@@ -1,14 +1,17 @@
 from ..transformer import IRTransform
 from ...irs import *
+from utils.errors import *
 from utils import SysArgs
 
 
 class IntrinsicTransform(IRTransform):
+    targets = (IntrinsicCallIR,)
+
     def intrinsic_print(self, Hir):
         if SysArgs.no_print:
             return []
 
-        SysArgs.add_extra_c_include("<print.h>")
+        self.ctx.add_c_header("<print.h>")
 
         args = Hir.args
         chunks = [args[i : i + 4] for i in range(0, len(args), 4)]
@@ -35,9 +38,18 @@ class IntrinsicTransform(IRTransform):
 
         return BlockIR(body=body)
 
+    def intrinsic_ord(self, hir):
+        return CallIR(
+            target=IdentifierIR(name="Nida_str_ord0"),
+            args=[hir.args[0]],
+            type=IntType(byte_size=8),
+        )
+
     def visit(self, node):
         if isinstance(node, IntrinsicCallIR) and isinstance(node.target, IdentifierIR):
             method = getattr(self, f"intrinsic_{node.target.name}", None)
             if method is not None:
                 return method(node)
+            else:
+                raise NidavellirInternalError(f"Unknown intrinsic: {node.target.name}")
         return node

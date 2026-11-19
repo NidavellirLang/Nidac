@@ -10,9 +10,10 @@ from IR_gen import IRProcessor
 from LIR_gen import IRLowerer
 from C_gen import C_Gen
 from C_gen import HeaderGenerator
-from utils import SysArgs, ExecutionTimer, NodeIdAllocator
+from utils import SysArgs, ExecutionTimer
 from utils.errors import NidavellirFileNotFoundError
 from .gcc import compile_c_file, run_compiled_file
+from .context import CompilerContext
 import sys
 
 sys.set_int_max_str_digits(0)
@@ -31,9 +32,7 @@ class Nidac:
         file_path: str = None,
         debug: bool = False,
     ):
-        self.ctx = {
-            "id_alloc": NodeIdAllocator(),
-        }
+        self.ctx = CompilerContext()
 
         self.source = source
         self.file_path = file_path
@@ -138,8 +137,6 @@ class Nidac:
         self.symbol_table_b = semantic_analyze(self.asts, self.ctx)
         self.symbol_tree = self.symbol_table_b.st
 
-        # self.ctx["stm"] = self.symbol_table_b.stm
-
         if SysArgs.dump_ast_after_semantic:
             print("===== AST (after semantic analysis) =====")
             print(self.asts)
@@ -182,14 +179,15 @@ class Nidac:
             if not module.lirs:
                 continue
 
-            extra_include = []
-            if module.dependencies:
-                for dep in module.dependencies:
-                    if not dep.include_path:
-                        raise Exception(f"No include path for module '{dep.name}'")
-                    extra_include.append(dep.include_path.name)
+            # TODO: impl
+            # extra_include = []
+            # if module.dependencies:
+            #     for dep in module.dependencies:
+            #         if not dep.include_path:
+            #             raise Exception(f"No include path for module '{dep.name}'")
+            #         extra_include.append(dep.include_path.name)
 
-            c_gen = C_Gen(module.lirs, extra_include=extra_include)
+            c_gen = C_Gen(module.lirs, self.ctx)
             module.c_code = c_gen.gen_from_list(module.lirs)
             c_nodes = c_gen.c_nodes
 
@@ -210,9 +208,9 @@ class Nidac:
             with open(c_header_path, "w") as f:
                 f.write(module.header_code)
 
-            SysArgs.add_include_path(c_header_path.parent)
-            SysArgs.add_extra_c_include(c_header_path.name)
-            SysArgs.add_c_file(c_path)
+            self.ctx.add_include_path(c_header_path.parent)
+            self.ctx.add_c_header(c_header_path.name)
+            self.ctx.add_c_source(c_path)
 
     def emit_c11(self):
         if self.lir is None:
@@ -220,7 +218,7 @@ class Nidac:
 
         self.generate_dependencies_c_code()
 
-        self.c_gen = C_Gen(self.lir)
+        self.c_gen = C_Gen(self.lir, self.ctx)
         self.final_c_code = self.c_gen.gen_from_list(self.lir)
 
         if SysArgs.dump_c:
@@ -238,7 +236,7 @@ class Nidac:
         with open(c_path, "w") as f:
             f.write(self.final_c_code)
 
-        compile_c_file(c_path, SysArgs.output)
+        compile_c_file(c_path, SysArgs.output, self.ctx)
         if not SysArgs.no_auto_run:
             self.run_binary(SysArgs.output)
 

@@ -53,8 +53,8 @@ Nida_Str Nida_input(Nida_Str prompt)
 
   buffer[len] = '\0';
 
-  return (Nida_Str){
-      .data = buffer,
-      .length = len,
-  };
+  Nida_Str result = Nida_str_from_utf8(buffer, len);
+  free(buffer);
+
+  return result;
 }

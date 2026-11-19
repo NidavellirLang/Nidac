@@ -17,4 +17,9 @@ INTRINSICS = {
         type=StringType(),
         params=ParamsType(OneOf(StringType), args_count=1),
     ),
+    "ord": IntrinsicAST(
+        name="ord",
+        type=IntType(),
+        params=ParamsType(OneOf(StringType), args_count=1),
+    ),
 }

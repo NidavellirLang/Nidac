@@ -209,6 +209,15 @@ class IRGen:
             node_id=self.get_id(ast),
         )
 
+    def gen_WhileAST(self, ast):
+        cond = self.gen_expr(ast.cond)
+        body = self.gen_stmts(ast.body)
+
+        return WhileIR(cond=cond, body=body, node_id=self.get_id(ast))
+
+    def gen_BreakAST(self, ast):
+        return BreakIR(node_id=self.get_id(ast))
+
     # ---------------------
     # ---- Expression -----
     # ---------------------
@@ -328,6 +337,12 @@ class IRGen:
 
         # raise Exception(idn_lk)
         return field_ir
+
+    def gen_IndexAccessAST(self, ast):
+        target = self.gen_expr(ast.target)
+        index = self.gen_expr(ast.index)
+
+        return IndexAccessIR(target=target, index=index, node_id=self.get_id(ast))
 
     # ---------------------
     # ---- Generators -----

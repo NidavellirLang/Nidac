@@ -45,6 +45,7 @@ typedef enum
   NIDA_TYPE_INT,
   NIDA_TYPE_DOUBLE,
   NIDA_TYPE_STR,
+  NIDA_TYPE_NIDA_STR,
   NIDA_TYPE_BOOL,
   NIDA_TYPE_CHAR,
   NIDA_TYPE_PTR,
@@ -59,6 +60,7 @@ typedef struct
     long long num;
     double dbl;
     const char *str;
+    Nida_Str nstr;
     bool boolean;
     char ch;
     const void *ptr;
@@ -80,7 +82,7 @@ static inline NidaVal _Nida_make_ptr_or_none(const void *v)
   return (NidaVal){.type = NIDA_TYPE_PTR, .value.ptr = v};
 }
 
-static inline NidaVal _Nida_make_Nida_str(Nida_Str v) { return (NidaVal){.type = NIDA_TYPE_STR, .value.str = v.data}; }
+static inline NidaVal _Nida_make_Nida_str(Nida_Str v) { return (NidaVal){.type = NIDA_TYPE_NIDA_STR, .value.nstr = v}; }
 
 #define NIDA_VAL(x) _Generic((x),       \
     bool: _Nida_make_bool,              \
@@ -118,6 +120,9 @@ static inline void _Nida_print_chunk(size_t count, const NidaVal args[], bool is
       break;
     case NIDA_TYPE_STR:
       printf("%s", args[i].value.str ? args[i].value.str : "None");
+      break;
+    case NIDA_TYPE_NIDA_STR:
+      Nida_str_print(args[i].value.nstr);
       break;
     case NIDA_TYPE_BOOL:
       printf("%s", args[i].value.boolean ? "true" : "false");

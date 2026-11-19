@@ -5,6 +5,7 @@ DEFAULT_PASSES = (
     ClassLowering,
     BoundMethods,
     IntrinsicTransform,
+    IndexPasser,
     CollectMain,
 )
 
