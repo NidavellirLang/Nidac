@@ -164,5 +164,5 @@ class ClassLowering(IRTransform):
             body=body,
             type=class_type,
             is_main_func=False,
-            is_static=False,
+            is_static=True,
         )

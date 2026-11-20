@@ -261,3 +261,7 @@ class IdentifierAST(AST):
 
 class BreakAST(AST):
     pass
+
+
+class ContinueAST(AST):
+    pass

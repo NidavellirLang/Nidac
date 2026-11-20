@@ -1244,6 +1244,11 @@ class Parser:
             line = self._make_line(token)
             return BreakAST(line=line, node_id=self.id_alloc.alloc())
 
+        if kind == "CONTINUE":
+            token = self.advance()
+            line = self._make_line(token)
+            return ContinueAST(line=line, node_id=self.id_alloc.alloc())
+
         if kind == "PASS":
             token = self.advance()
             line = self._make_line(token)

@@ -733,6 +733,9 @@ class SymbolTreeBuilder:
     def stmt_BreakAST(self, ast):
         return BreakSymbol(ast_node=ast)
 
+    def stmt_ContinueAST(self, ast):
+        return ContinueSymbol(ast_node=ast)
+
     def process_eval(self, ast):
         method_name = f"eval_{type(ast).__name__}"
         visitor = getattr(self, method_name, None)

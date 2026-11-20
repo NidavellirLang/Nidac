@@ -589,6 +589,18 @@ class IRLowerer:
 
         raise RuntimeError("break outside loop")
 
+    def process_ContinueIR(self, hir):
+        ctx = self.blocks.current.block.block_ctx
+
+        while ctx is not None:
+            if ctx.continue_target is not None:
+                self.blocks.jump(ctx.continue_target)
+                return
+
+            ctx = ctx.parent
+
+        raise RuntimeError("continue outside loop")
+
     def process_ForIR(self, hir):
         # The First block
         target = hir.target.target

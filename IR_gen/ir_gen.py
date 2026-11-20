@@ -233,6 +233,9 @@ class IRGen:
     def gen_BreakAST(self, ast):
         return BreakIR(node_id=self.get_id(ast))
 
+    def gen_ContinueAST(self, ast):
+        return ContinueIR(node_id=self.get_id(ast))
+
     # ---------------------
     # ---- Expression -----
     # ---------------------
@@ -330,7 +333,7 @@ class IRGen:
 
         lk = self.get_lk(ast)
         type = lk.type
-        # raise Exception(ast)
+
         value = self.gen_expr(ast.right)
         return UnaryOpIR(op=op, value=value, type=type, node_id=self.get_id(ast))
 

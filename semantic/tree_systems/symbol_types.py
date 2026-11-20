@@ -480,6 +480,11 @@ class BreakSymbol(Symbol):
 
 
 @dataclass(slots=True, repr=False)
+class ContinueSymbol(Symbol):
+    pass
+
+
+@dataclass(slots=True, repr=False)
 class IndexAccessSymbol(Symbol):
     target: VariableSymbol
     index: Symbol

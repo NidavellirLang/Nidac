@@ -83,6 +83,10 @@ class BreakIR(StmtIR):
     pass
 
 
+class ContinueIR(StmtIR):
+    pass
+
+
 @dataclass(slots=True, kw_only=True, repr=False)
 class AssignIR(StmtIR):
     __child__ = ("value", "target")

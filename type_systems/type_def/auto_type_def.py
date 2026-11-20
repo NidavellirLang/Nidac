@@ -819,6 +819,9 @@ class AutoTypeDefEngine:
     def process_BreakSymbol(self, sym):
         pass
 
+    def process_ContinueSymbol(self, sym):
+        pass
+
     def process_IndexAccessSymbol(self, sym):
         self.process(sym.target)
         self.process(sym.index)
