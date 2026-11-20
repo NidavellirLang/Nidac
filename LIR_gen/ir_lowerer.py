@@ -463,36 +463,14 @@ class IRLowerer:
 
         return cast_id
 
-    def _get_operator_rules(self, typex):
-        if isinstance(typex, StringType):
-            return STR_OPS
-
-        # TODO: impl dynamic int/float
-        # if isinstance(typex, IntType) and typex.is_dynamic:
-        #     return IDYN_OPS
-
-        # if isinstance(typex, FloatType) and typex.is_dynamic:
-        #     return FDYN_OPS
-
-        return INT_OPS
-
     def _op_to_lir(self, typex, left_id, right_id, op):
-        rules = self._get_operator_rules(typex)
-        rule = rules.get(op)
+        rule = INT_OPS.get(op)
 
         if rule is None:
             raise Exception(f"Unsupported operator: {typex} {op}")
 
         result_id = self.get_value_id()
         result_type = rule.result_type or self.type_to_str(typex)
-
-        if rule.runtime is not None:
-            return CallLIR(
-                result_id,
-                result_type,
-                rule.runtime,
-                [left_id, right_id],
-            )
 
         return rule.instruction(
             result_id,
@@ -757,15 +735,26 @@ class IRLowerer:
         return new_lir
 
     def process_UnaryOpIR(self, hir):
-        op = hir.op
-
         value_lirs = self.process(hir.value)
         value_id = self.get_current_value_id()
 
-        type_str = self.str_of(hir)
-        result_id = self.get_value_id()
+        op_map = {
+            "not": NotLIR,
+            "-": NegLIR,
+            "+": PosLIR,
+        }
 
-        lir = UnaryOpLIR(result_id, op, value_id, type_str)
+        instruction = op_map.get(hir.op)
+
+        if instruction is None:
+            raise ValueError(f"Unsupported unary operator: {hir.op}")
+
+        lir = instruction(
+            self.get_value_id(),
+            self.str_of(hir),
+            value_id,
+        )
+
         self.blocks.emit(lir)
 
         lirs = LIRs()

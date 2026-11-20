@@ -6,6 +6,7 @@ DEFAULT_PASSES = (
     BoundMethods,
     IntrinsicTransform,
     IndexPasser,
+    BinaryOpPasser,
     CollectMain,
 )
 

@@ -396,8 +396,28 @@ class Parser:
 
         return left
 
+    def parse_not(self):
+        if self.peek_kind() == "NOT":
+            op_token = self.advance()
+            right = self.parse_not()
+
+            line = self._span_line(
+                self._make_line(op_token),
+                right.line,
+                op_token,
+            )
+
+            return UnaryOpAST(
+                op=op_token[1],
+                right=right,
+                line=line,
+                node_id=self.id_alloc.alloc(),
+            )
+
+        return self.parse_equality()
+
     def parse_and(self):
-        left = self.parse_equality()
+        left = self.parse_not()
 
         while self.peek_kind() in ("AND"):
             op_token = self.advance()

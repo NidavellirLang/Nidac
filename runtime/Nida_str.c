@@ -288,6 +288,11 @@ bool Nida_str_eq(Nida_Str a, Nida_Str b)
   return true;
 }
 
+bool Nida_str_not(Nida_Str s)
+{
+  return s.data == NULL || s.length == 0;
+}
+
 Nida_Str Nida_str_index(Nida_Str s, size_t index)
 {
   if (s.data == NULL || index >= s.length)

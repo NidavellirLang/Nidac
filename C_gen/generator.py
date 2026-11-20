@@ -175,6 +175,10 @@ class C_Gen:
                 return "=="
             case _ if isinstance(lir_node, NeLIR):
                 return "!="
+            case _ if isinstance(lir_node, OrLIR):
+                return "||"
+            case _ if isinstance(lir_node, AndLIR):
+                return "&&"
             case _:
                 raise Exception(
                     f"No operator string for LIR node {type(lir_node).__name__}"
@@ -228,6 +232,12 @@ class C_Gen:
         return self._bin_ops(lir)
 
     def process_NeLIR(self, lir):
+        return self._bin_ops(lir)
+
+    def process_OrLIR(self, lir):
+        return self._bin_ops(lir)
+
+    def process_AndLIR(self, lir):
         return self._bin_ops(lir)
 
     def process_DeclareLIR(self, lir):
@@ -361,13 +371,22 @@ class C_Gen:
             self.translate_type(lir.type),
         )
 
-    def process_UnaryOpLIR(self, lir):
+    def _process_unary(self, lir, op):
         name = self.name_maper(lir.name)
-        type = self.translate_type(lir.type)
+        type_name = self.translate_type(lir.type)
+        value = self.name_maper(lir.value)
 
-        val_name = self.name_maper(lir.value)
+        expr = CUnaryOp(op, value)
+        return CVarDecl(name, type_name, expr)
 
-        return CUnaryOp(name, lir.op, val_name, type)
+    def process_NotLIR(self, lir):
+        return self._process_unary(lir, "!")
+
+    def process_NegLIR(self, lir):
+        return self._process_unary(lir, "-")
+
+    def process_PosLIR(self, lir):
+        return self._process_unary(lir, "+")
 
     def process(self, lir):
         name = lir.__class__.__name__

@@ -413,15 +413,23 @@ class CNew(CNode):
         return f"({self.class_name} *)calloc(1, sizeof({self.class_name}))"
 
 
-class CUnaryOp(CNode):
-    def __init__(self, name, op, value, type=None):
+class CVarDecl(CNode):
+    def __init__(self, name, type, value):
         self.name = name
-        self.op = op
-        self.value = value
         self.type = type
+        self.value = value
 
     def __str__(self):
-        return f"{self.type} {self.name} = {self.op}{self.value}"
+        return f"{self.type} {self.name} = {self.value};"
+
+
+class CUnaryOp(CNode):
+    def __init__(self, op, value):
+        self.op = op
+        self.value = value
+
+    def __str__(self):
+        return f"({self.op}{self.value})"
 
 
 class CCast(CNode):

@@ -99,6 +99,19 @@ class IRGen:
         lk = self.get_lk(ast)
         return lk.resolve_name
 
+    def _translate_sym_to_ir(self, sym: AssignSymbol | MergeAssignmentSymbol):
+        if isinstance(sym, MergeAssignmentSymbol) and sym.merge_sym is not None:
+            return self._translate_sym_to_ir(sym.merge_sym)
+        else:
+            return AssignIR(
+                target=IdentifierIR(name=sym.name),
+                value=NoneIR(air=True),
+                type=sym.type,
+            )
+
+    def _create_if_merges(self, merge_syms):
+        return [self._translate_sym_to_ir(sym) for sym in merge_syms]
+
     # ---------------------
     # ----- Statement -----
     # ---------------------
@@ -179,8 +192,7 @@ class IRGen:
         else_body_irs = (
             self.gen_stmt(ast.else_body) if ast.else_body is not None else None
         )
-
-        return IfIR(
+        If = IfIR(
             cond=cond,
             body=body,
             elifs=elifs,
@@ -188,6 +200,9 @@ class IRGen:
             if_sym=lk,
             node_id=self.get_id(ast),
         )
+        merges = self._create_if_merges(lk.merges)
+        body = [*merges, If]
+        return BlockIR(body=body, node_id=self.get_id(ast))
 
     def gen_ClassAST(self, ast):
         name = ast.name
@@ -267,17 +282,13 @@ class IRGen:
 
         args = self._gen_call_args(ast.args)
 
-        ir = IntrinsicCallIR(
+        return IntrinsicCallIR(
             intrinsic=intrinsic,
             target=target,
             args=args,
             type=type,
             node_id=self.get_id(ast),
         )
-
-        # handler = intrinsic.handler
-        # new_ir = handler(ir)
-        return ir
 
     def gen_CallAST(self, ast):
         lk = self.get_lk(ast)
@@ -303,7 +314,9 @@ class IRGen:
         )
 
     def gen_StringAST(self, ast):
-        return StringLiteralIR(value=ast.value, node_id=self.get_id(ast))
+        return StringLiteralIR(
+            value=ast.value, node_id=self.get_id(ast), type=StringType()
+        )
 
     def gen_BooleanAST(self, ast):
         value = ast.value
