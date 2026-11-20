@@ -172,6 +172,7 @@ class AutoTypeDefEngine:
 
         right = sym.right_sym
         left = sym.left_sym
+        op = sym.ast_node.op
 
         if right.type is None:
             self.process(right)
@@ -185,20 +186,68 @@ class AutoTypeDefEngine:
                 sym.ast_node.line,
             )
 
-        if isinstance(left.type, NumberType) and isinstance(right.type, NumberType):
+        lt = left.type
+        rt = right.type
+
+        comparison_ops = {"==", "!=", ">", "<", ">=", "<="}
+        logical_ops = {"and", "or"}
+        bitwise_ops = {"&", "|", "^", "<<", ">>"}
+
+        if op in logical_ops:
+            if not isinstance(lt, BoolType) or not isinstance(rt, BoolType):
+                raise NidavellirTypeError(
+                    f"Logical operator '{op}' requires bool operands, got {lt} and {rt}",
+                    sym.ast_node.line,
+                )
+
+            result_type = BoolType()
+
+        elif op in comparison_ops:
+            if isinstance(lt, NumberType) and isinstance(rt, NumberType):
+                pass
+            elif type(lt) is type(rt):
+                if not isinstance(lt, (StringType, BoolType)):
+                    raise NidavellirTypeError(
+                        f"Cannot compare operands of type {lt}",
+                        sym.ast_node.line,
+                    )
+            else:
+                raise NidavellirTypeError(
+                    f"Incompatible comparison types: {lt} and {rt}",
+                    sym.ast_node.line,
+                )
+
+            result_type = BoolType()
+
+        elif op in bitwise_ops:
+            if not isinstance(lt, IntType) or not isinstance(rt, IntType):
+                raise NidavellirTypeError(
+                    f"Bitwise operator '{op}' requires integer operands, got {lt} and {rt}",
+                    sym.ast_node.line,
+                )
+
+            result_type = lt
+
+        elif isinstance(lt, NumberType) and isinstance(rt, NumberType):
             if isinstance(expected_type, FloatType):
                 result_type = FloatType()
-            elif isinstance(left.type, FloatType) or isinstance(right.type, FloatType):
+            elif isinstance(lt, FloatType) or isinstance(rt, FloatType):
                 result_type = FloatType()
             else:
-                result_type = left.type
+                result_type = lt
 
-        elif type(left.type) == type(right.type):
-            result_type = left.type
+        elif isinstance(lt, StringType) and isinstance(rt, StringType):
+            if op == "+":
+                result_type = StringType()
+            else:
+                raise NidavellirTypeError(
+                    f"Unsupported string operator: {op}",
+                    sym.ast_node.line,
+                )
 
         else:
             raise NidavellirTypeError(
-                f"Incompatible operand types: {left.type} and {right.type}",
+                f"Incompatible operand types: {lt} and {rt}",
                 sym.ast_node.line,
             )
 

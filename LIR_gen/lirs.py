@@ -179,6 +179,43 @@ class NeLIR(LIR):
         self.right_id = right_id
 
 
+class OrLIR(LIR):
+    def __init__(self, name, type, left_id, right_id):
+        self.name = name
+        self.type = type
+        self.left_id = left_id
+        self.right_id = right_id
+
+
+class AndLIR(LIR):
+    def __init__(self, name, type, left_id, right_id):
+        self.name = name
+        self.type = type
+        self.left_id = left_id
+        self.right_id = right_id
+
+
+class NotLIR(LIR):
+    def __init__(self, name, type, value):
+        self.name = name
+        self.type = type
+        self.value = value
+
+
+class NegLIR(LIR):
+    def __init__(self, name, type, value):
+        self.name = name
+        self.type = type
+        self.value = value
+
+
+class PosLIR(LIR):
+    def __init__(self, name, type, value):
+        self.name = name
+        self.type = type
+        self.value = value
+
+
 class CallLIR(LIR):
     def __init__(
         self, name, type, func_name, args, receiver=None, field=None, func_type=None
@@ -275,14 +312,6 @@ class NewLIR(LIR):
     def __init__(self, name, class_name, type=None):
         self.name = name
         self.class_name = class_name
-        self.type = type
-
-
-class UnaryOpLIR(LIR):
-    def __init__(self, name, op, value, type=None):
-        self.name = name
-        self.op = op
-        self.value = value
         self.type = type
 
 

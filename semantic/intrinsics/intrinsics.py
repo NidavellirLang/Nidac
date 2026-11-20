@@ -22,4 +22,9 @@ INTRINSICS = {
         type=IntType(),
         params=ParamsType(OneOf(StringType), args_count=1),
     ),
+    "len": IntrinsicAST(
+        name="len",
+        type=IntType(),
+        params=ParamsType(OneOf(StringType, ListType), args_count=1),
+    ),
 }

@@ -57,6 +57,9 @@ def run_compiled_file(
     if SysArgs.verbose_errors:
         print("\n\n\n")
 
+    if SysArgs.run_timeout is not None:
+        timeout = SysArgs.run_timeout
+
     exec_path = Path(bin_path).resolve()
 
     if not exec_path.exists():

@@ -45,6 +45,21 @@ class IntrinsicTransform(IRTransform):
             type=IntType(byte_size=8),
         )
 
+    def intrinsic_len(self, hir):
+        return CallIR(
+            target=IdentifierIR(name="Nida_str_len"),
+            args=[hir.args[0]],
+            type=IntType(byte_size=8),
+        )
+
+    def intrinsic_input(self, hir):
+        self.ctx.add_c_header("<input.h>")
+        return CallIR(
+            target=IdentifierIR(name="Nida_input"),
+            args=[hir.args[0]],
+            type=StringType(),
+        )
+
     def visit(self, node):
         if isinstance(node, IntrinsicCallIR) and isinstance(node.target, IdentifierIR):
             method = getattr(self, f"intrinsic_{node.target.name}", None)

@@ -83,6 +83,14 @@ class SysArgsClass:
         )
 
         parser.add_argument(
+            "-rto",
+            "--run-timeout",
+            type=float,
+            default=0.0,
+            help="Timeout for the compiled binary (in seconds)",
+        )
+
+        parser.add_argument(
             "-nc",
             "--no-cache",
             action="store_true",

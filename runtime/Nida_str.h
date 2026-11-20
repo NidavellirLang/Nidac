@@ -19,6 +19,7 @@ void Nida_str_free(Nida_Str *s);
 
 Nida_Str Nida_str_concat(Nida_Str a, Nida_Str b);
 bool Nida_str_eq(Nida_Str a, Nida_Str b);
+bool Nida_str_not(Nida_Str s);
 Nida_Str Nida_str_index(Nida_Str s, size_t index);
 
 size_t Nida_str_len(Nida_Str s);
