@@ -9,7 +9,7 @@ class IntrinsicTransform(IRTransform):
 
     def intrinsic_print(self, Hir):
         if SysArgs.no_print:
-            return []
+            return BlockIR(body=[])
 
         self.ctx.add_c_header("<print.h>")
 

@@ -54,9 +54,9 @@ lowering, and callable reference support.
 
 - `Nida_Str` uses a PEP 393-style flexible representation:
   `{ void *data; size_t length; uint8_t kind; }` with 1/2/4-byte code units.
-- Implementation lives in `runtime/Nida_str.c`; declarations in
-  `runtime/Nida_str.h`. UTF-8 encode/decode, validation, concat, equality,
-  indexing, `len`, `ord`, `ord0`, and emptiness are available.
+- Implementation is header-only in `runtime/Nida_str.h` (`static inline`), so no
+  extra C translation unit is linked in. UTF-8 encode/decode, validation, concat,
+  equality, indexing, `len`, `ord`, `ord0`, and emptiness are available.
 
 ## Next Steps
 

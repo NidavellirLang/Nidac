@@ -110,7 +110,14 @@ class IRGen:
             )
 
     def _create_if_merges(self, merge_syms):
-        return [self._translate_sym_to_ir(sym) for sym in merge_syms]
+        merges = []
+        for merge in merge_syms:
+            if merge.merge_sym.parent_assign is not None:
+                continue
+
+            merges.append(self._translate_sym_to_ir(merge))
+        # return [self._translate_sym_to_ir(sym) for sym in merge_syms]
+        return merges
 
     # ---------------------
     # ----- Statement -----

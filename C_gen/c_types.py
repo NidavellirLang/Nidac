@@ -67,9 +67,6 @@ class CTString(CType):
     def required_headers(self):
         return {'"Nida_str.h"'}
 
-    def required_sources(self) -> set[Path]:
-        return {"Nida_str.c"}
-
     def __str__(self):
         return "Nida_Str"
 
