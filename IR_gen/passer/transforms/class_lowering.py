@@ -21,6 +21,19 @@ class ClassLowering(IRTransform):
             return self.process_call(ir)
         if isinstance(ir, AssignIR) and isinstance(ir.type, BoundMethodType):
             return self.process_assign_field(ir)
+        if (
+            isinstance(ir, ReturnIR)
+            and isinstance(ir.value, FieldAccessIR)
+            and isinstance(ir.value.type, ClassMethodRefType)
+        ):
+            self.changed = True
+            ir.value = BoundMethodIR(
+                receiver=ir.value.target,
+                method=ir.value.type.lk.name,
+                type=ir.value.type,
+                node_id=ir.value.node_id,
+            )
+            return ir
         return ir
 
     def generate_self_ref(self, instance_lk):

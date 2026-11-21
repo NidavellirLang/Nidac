@@ -73,8 +73,8 @@ class CTypeTranslator:
             if isinstance(type_name, RefType):
                 param_types, return_type = type_name.get_types()
 
-                param_c_types = [cls.translate_type(p) for p in param_types]
-                return_c_type = cls.translate_type(return_type)
+                param_c_types = [cls.translate(p) for p in param_types]
+                return_c_type = cls.translate(return_type)
                 return CTFuncRef(param_c_types, return_c_type)
 
             raise Exception(
@@ -365,6 +365,7 @@ class C_Gen:
         return CFieldStore(target, lir.field, value)
 
     def process_NewLIR(self, lir):
+        self.ctx.add_c_header("<stdlib.h>")
         return CAssign(
             self.name_maper(lir.name),
             CNew(lir.class_name),

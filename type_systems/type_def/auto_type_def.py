@@ -1,3 +1,5 @@
+import sys
+
 from ..types import *
 from semantic.tree_systems.symbol_types import *
 from utils.errors import *
@@ -18,6 +20,7 @@ def detect_type(value: str):
 class AutoTypeDefEngine:
     def __init__(self, sym_tree):
         self.sym_tree = sym_tree
+        self._active = set()
 
     def process_NoneSymbol(self, sym):
         sym.type = NoneType()
@@ -282,6 +285,40 @@ class AutoTypeDefEngine:
         pass
 
     def _process_FunctionSymbol(self, sym):
+        key = id(sym)
+        if key in self._active:
+            return
+
+        self._active.add(key)
+        try:
+            self._process_FunctionSymbol_inner(sym)
+        finally:
+            self._active.discard(key)
+
+    def _process_FunctionSymbol_inner(self, sym):
+        self._seed_param_types(sym)
+
+        value_returns = [
+            node for node in self._infer_returns(sym.body) if node.value is not None
+        ]
+
+        if sym.type is None:
+            literal_types = (NumberSymbol, StringSymbol, BooleanSymbol, NoneSymbol)
+
+            for node in value_returns:
+                if not isinstance(node.value, literal_types):
+                    continue
+                if node.value.type is None:
+                    self.process(node.value)
+                if node.value.type is not None:
+                    with TypeUpdate(sym):
+                        sym.type = node.value.type
+                    break
+
+            if sym.type is None and not value_returns:
+                with TypeUpdate(sym):
+                    sym.type = NoneType()
+
         arg_types = {}
         sym.is_called = True
 
@@ -355,6 +392,31 @@ class AutoTypeDefEngine:
 
         # raise Exception(sym.args)
 
+    def _seed_param_types(self, sym):
+        literal_types = (NumberSymbol, StringSymbol, BooleanSymbol, NoneSymbol)
+
+        for call in sym.uses:
+            if not isinstance(call, (CallSymbol, ConstructorCallSymbol)):
+                continue
+
+            offset = getattr(call, "arg_offset", 0)
+
+            for idx, arg in enumerate(call.args):
+                pos = idx + offset
+                if pos >= len(sym.args):
+                    continue
+                if not isinstance(arg, literal_types):
+                    continue
+                if sym.args[pos].type is not None:
+                    continue
+
+                if arg.type is None:
+                    self.process(arg)
+
+                if arg.type is not None:
+                    with TypeUpdate(sym.args[pos]):
+                        sym.args[pos].type = arg.type
+
     def process_ReturnSymbol(self, sym):
         if sym.value is None:
             return
@@ -367,8 +429,13 @@ class AutoTypeDefEngine:
                 "Cannot determine type of return value", sym.ast_node.line
             )
 
+        value_type = sym.value.type
+
+        if isinstance(value_type, ClassMethodRefType):
+            value_type = BoundMethodType(value_type)
+
         with TypeUpdate(sym):
-            sym.type = sym.value.type
+            sym.type = value_type
 
     def _get_calls_from_value(self, val_sym):
         uses = val_sym.uses if hasattr(val_sym, "uses") else []
@@ -842,11 +909,21 @@ class AutoTypeDefEngine:
             raise NidavellirInternalError(
                 f"No visitor method '{method_name}' for symbol", sym.ast_node.line
             )
-        return visitor(sym)
+
+        key = id(sym)
+        if key in self._active:
+            return None
+
+        self._active.add(key)
+        try:
+            return visitor(sym)
+        finally:
+            self._active.discard(key)
 
     def process_from_list(self, syms):
         for sym in syms:
             self.process(sym)
 
     def run(self):
+        sys.setrecursionlimit(max(sys.getrecursionlimit(), 20000))
         self.process_from_list(self.sym_tree)

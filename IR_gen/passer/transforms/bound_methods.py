@@ -29,6 +29,23 @@ class BoundMethods(IRTransform):
         if isinstance(ir, BoundCallIR):
             return self.process_bound_call(ir)
 
+        if isinstance(ir, ReturnIR) and isinstance(ir.value, BoundMethodIR):
+            self.create_bound_reqs()
+
+            value = ir.value
+            ir.value = CallIR(
+                target=IdentifierIR(name=self.initializer.name),
+                args=[
+                    value.receiver,
+                    FunctionRefIR(name=value.method, type=self.fn_type),
+                ],
+                type=self.struct_type,
+                node_id=ir.node_id,
+            )
+            ir.type = self.struct_type
+            self.changed = True
+            return ir
+
         if isinstance(ir, (FunctionIR, ReturnIR, ParameterIR, VariableIR, IdentifierIR)):
             if isinstance(ir.type, BoundMethodType):
                 self.create_bound_reqs()

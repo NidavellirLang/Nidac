@@ -2,26 +2,23 @@
 
 ## Active Work
 
-Completing class and method semantics, particularly callable references, bound method resolution, and function return values.
+New HIR passer architecture (HIR → MIR → LIR) with bound method lowering, class
+lowering, and callable reference support.
 
-The HIR-to-LIR lowering code is also being adapted to the updated assignment and call target representation.
+## Current IR
 
-### Current IR Changes
-
-- `AssignIR` no longer uses a separate `name` and `field` representation. Its `target` is either `IdentifierIR` or `FieldAccessIR`.
-- `CallIR` is moving from `name` to `target`, with the same target contract: `IdentifierIR` or `FieldAccessIR`.
-- LIR generation must distinguish identifier calls from field/method calls and preserve receiver evaluation.
-- These changes are still being integrated; do not consider the lowering implementation fully verified yet.
-
-## Known Issues
-
-- **Callable return values lose their callable semantics.**
-
-  When a function returns a bound method reference, Auto Type Def currently preserves the original function reference instead of resolving the callable type of its return value.
-
-  Consequently, calling the returned reference incorrectly uses the original function's argument requirements rather than the bound method's signature.
-
-- Function references and callable values returned from functions need broader testing. Their type information, argument handling, and receiver binding are not yet fully verified.
+- `AssignIR.target` is either `IdentifierIR` or `FieldAccessIR`.
+- `CallIR.target` follows the same contract. `CallIR.indirect` marks
+  field-based function-pointer calls.
+- `BoundMethodIR` / `BoundCallIR` represent callable values and their calls.
+- `FunctionRefIR` carries a function pointer value.
+- `ClassLowering` lowers classes, methods, `self` binding, and call targets.
+- `BoundMethods` lowers callable references into a single generic
+  `{ self, fn }` struct plus one initializer function.
+- `CollectMain` gathers top-level statements into `main`.
+- Default pipeline: `ClassLowering → BoundMethods → CollectMain`.
+- `IRTransform.targets` allows a pass to visit only selected IR types.
+- `PassManager` injects the per-run `ctx` into each transform.
 
 ## Working Features
 
@@ -35,11 +32,36 @@ The HIR-to-LIR lowering code is also being adapted to the updated assignment and
 - Cross-instance method calls and object interactions.
 - Method forwarding and reference preservation.
 - Object composition and mutations across multiple instances.
-- Receiver expressions can be materialized as intermediate values in HIR Passer and passed as implicit `self`.
+- Receiver expressions materialized as intermediate values in HIR Passer and
+  passed as implicit `self`.
+- Bound method references returned from functions, both assigned to a local
+  first and returned directly; the returned reference keeps its receiver and
+  signature.
+- Recursive function type inference (parameter seeding from literal call sites,
+  provisional return types, cycle guards in Auto Type Def).
+- Correct `if` block ordering in LIR (then → false → merge).
 
-A comprehensive local regression program covering method references, aliases, nested receivers, mutations, forwarding, and cross-instance interactions compiles and executes successfully.
+## Known Limitations
+
+- Index access (`s[i]`) is not implemented beyond the parser: no semantic
+  `eval_IndexAccessAST`, no `IndexAccessIR`, no LIR/C lowering.
+- `len` / `ord` are not registered intrinsics yet, although the runtime
+  provides `Nida_str_len` / `Nida_str_ord` / `Nida_str_ord0`.
+- Callable values in arbitrary expression positions (e.g. passed as arguments)
+  are not supported; lowering covers assignments and returns.
+
+## Runtime
+
+- `Nida_Str` uses a PEP 393-style flexible representation:
+  `{ void *data; size_t length; uint8_t kind; }` with 1/2/4-byte code units.
+- Implementation lives in `runtime/Nida_str.c`; declarations in
+  `runtime/Nida_str.h`. UTF-8 encode/decode, validation, concat, equality,
+  indexing, `len`, `ord`, `ord0`, and emptiness are available.
 
 ## Next Steps
 
-- Fix callable return-value resolution, especially functions returning bound method references.
-- Preserve bound receiver identity when a method reference is returned from a
+- Implement index access end to end.
+- Wire `len` / `ord` intrinsics to the new string representation.
+- Extend callable-value lowering to argument positions.
+- Add scope/lifetime analysis to decide when bound-method structs and class
+  instances can stay on the stack or be captured.

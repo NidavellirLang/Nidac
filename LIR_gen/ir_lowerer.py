@@ -198,7 +198,7 @@ class IRLowerer:
     def process_ReturnIR(self, hir):
         lirs = LIRs()
         val = hir.value
-        if val is None:
+        if val is None or (isinstance(val, NoneIR) and val.air):
             ret_lir = ReturnLIR(None)
             self.blocks.terminate(ret_lir)
             return ret_lir
@@ -526,15 +526,18 @@ class IRLowerer:
         return lirs
 
     def process_IfIR(self, hir):
+        has_else_path = bool(hir.elifs) or hir.else_body is not None
+
+        then_block = self.blocks.create_block()
+        false_target = self.blocks.create_block() if has_else_path else None
         merge_block = self.blocks.create_block()
 
-        has_else_path = bool(hir.elifs) or hir.else_body is not None
-        false_target = self.blocks.create_block() if has_else_path else merge_block
+        if false_target is None:
+            false_target = merge_block
 
         self.process(hir.cond)
         cond_id = self.get_current_value_id()
 
-        then_block = self.blocks.create_block()
         self.blocks.branch(cond_id, then_block, false_target)
 
         self.blocks.switch_to(then_block)
