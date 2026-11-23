@@ -1,6 +1,5 @@
 from pathlib import Path
 
-from lexer import Lexer
 from nida_ast import Parser
 from semantic import semantic_analyze
 from import_systems import ImportSystem
@@ -40,7 +39,6 @@ class Nidac:
 
         self.current_path = Path.cwd()
 
-        self.lexer = None
         self.asts = []
         self.imported_modules = []
         self.symbol_table = None
@@ -57,9 +55,6 @@ class Nidac:
     def compile(self):
         """Run the whole pipeline, honouring --stop-after and --no-binary-compile."""
         timer = ExecutionTimer()
-
-        timer.start("Lexer")
-        self.lex()
 
         timer.start("Parser")
         self.parse()
@@ -105,18 +100,11 @@ class Nidac:
     # Frontend
     # ------------------------------------------------------------------
 
-    def lex(self):
+    def parse(self):
         if self.source is None:
             self.read_file()
 
-        self.lexer = Lexer(self.source)
-        return self.lexer
-
-    def parse(self):
-        if not self.lexer:
-            self.lex()
-
-        parser = Parser(self.lexer, self.ctx)
+        parser = Parser(self.source, self.ctx)
 
         self.asts = parser.run()
         if SysArgs.dump_ast:
@@ -274,10 +262,8 @@ class Nidac:
 
     @staticmethod
     def parse_from_source_code(source_code):
-        lexer_obj = Lexer(source_code)
-        parser = Parser(lexer_obj)
-        parser.parse_all()
-        return parser.asts
+        parser = Parser(source_code)
+        return parser.run()
 
 
 SysArgs.nidac_ptr = Nidac

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, fields, field
 from utils.errors import Line
+
 from typing import Any
 
 
@@ -123,8 +124,7 @@ class IndexAccessAST(AST):
 
 @dataclass(slots=True, repr=False)
 class CallAST(AST):
-    target: str
-    field: AST | None
+    target: IdentifierAST | FieldAccessAST
     args: list
 
 
@@ -135,8 +135,7 @@ class ReturnAST(AST):
 
 @dataclass(slots=True, repr=False)
 class AssignAST(AST):
-    target: str
-    field: AST | None
+    target: IdentifierAST | FieldAccessAST
     value: AST | None
     type: str | None
 

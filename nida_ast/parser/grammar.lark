@@ -1,0 +1,201 @@
+%import common.WS_INLINE
+
+%ignore WS_INLINE
+
+%declare _INDENT _DEDENT
+
+start: (_NEWLINE | simple_stmt _NEWLINE | compound_stmt)* simple_stmt?
+
+// ---- MAIN ---- //
+
+expr: binary_op
+
+field_access: (call | NAME) "." NAME
+
+?access: NAME
+    | field_access
+
+target: access
+
+variable: access
+
+?typed_name: NAME? NAME
+
+?atom: NUMBER
+    | "(" expr ")"
+    | STR
+    | BOOL
+
+simple_stmt: assignment
+    | call
+    | return
+    | pass
+    | continue
+    | break
+
+?compound_stmt: function_def
+    | class
+    | if
+    | for
+    | while
+
+stmt: simple_stmt
+    | compound_stmt
+
+// STMTS
+
+assignment: NAME? target (aug_assign_op | ASSIGN_OP) expr
+
+function_def: "def" typed_name "(" func_args? ")" ":" suite
+
+class: "class" NAME ":" suite
+
+if: "if" expr ":" suite elifs? else?
+
+for: "for" typed_name "in" expr ":" suite
+
+while: "while" expr ":" suite
+
+return: "return" expr?
+
+break: "break"
+
+continue: "continue"
+
+pass: "pass"
+
+// Exprs
+
+call: target "(" call_args? ")"
+
+// STMT HELPERS
+
+suite: _NEWLINE _INDENT (_NEWLINE | simple_stmt _NEWLINE | compound_stmt)* simple_stmt? _DEDENT
+
+elif: "elif" expr ":" suite
+
+elifs: elif+
+
+else: "else" ":" suite
+
+ASSIGN_OP: "="
+
+aug_assign_op: ADD ASSIGN_OP
+    | SUB ASSIGN_OP
+    | MUL ASSIGN_OP
+    | DIV ASSIGN_OP
+    | MOD ASSIGN_OP
+
+// EXPR HELPERS
+
+call_args: expr ("," expr)*
+
+func_args: typed_name ("," typed_name)*
+
+?postfix: atom
+    | variable
+
+// LEXICAL
+
+_NEWLINE: (/\r?\n[\t ]*/)+
+
+// BinaryOP
+
+?binary_op: logical_or
+
+?logical_or: logical_or OR logical_and
+    | logical_and
+
+?logical_and: logical_and AND comparison
+    | comparison
+
+?comparison: arithmetic (comparison_op arithmetic)*
+
+?arithmetic: arithmetic arithmetic_op term
+    | term
+
+?term: term term_op unary
+    | unary
+
+?unary: unary_op unary
+    | postfix
+
+// Operators
+
+logical_op: OR
+    | AND
+
+comparison_op: EQ
+    | NE
+    | LT
+    | GT
+    | LE
+    | GE
+    | IS_NOT
+    | IS
+    | NOT_IN
+    | IN
+
+arithmetic_op: ADD
+    | SUB
+
+term_op: MUL
+    | DIV
+    | MOD
+
+unary_op: ADD
+    | SUB
+    | NOT
+
+// Terminals
+
+STR: /"([^"\\\r\n]|\\.)*"|'([^'\\\r\n]|\\.)*'/
+
+NAME: /[a-zA-Z_][a-zA-Z0-9_]*/
+
+NUMBER: /[0-9]+/
+
+ADD: "+"
+
+SUB: "-"
+
+MUL: "*"
+
+DIV: "/"
+
+MOD: "%"
+
+EQ: "=="
+
+NE: "!="
+
+LT: "<"
+
+GT: ">"
+
+LE: "<="
+
+GE: ">="
+
+IS_NOT: "is" "not"
+
+IS: "is"
+
+NOT: "not"
+
+NOT_IN: "not" "in"
+
+IN: "in"
+
+OR: "or"
+
+AND: "and"
+
+BOOL: "True"
+    | "False"
+
+COMMENT: /#[^\n]*/
+
+%ignore COMMENT
+
+%ignore COMMENT
