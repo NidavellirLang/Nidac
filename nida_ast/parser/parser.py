@@ -1,12 +1,10 @@
-from lark import Lark
-from lark.indenter import Indenter
-
 from pathlib import Path
-
 from .transformer import ASTTranslator
 
+from .lark_loader import LarkLoader
 
-class NidaIndenter(Indenter):
+
+class NidaIndenter(LarkLoader.Indenter):
     NL_type = "_NEWLINE"
     OPEN_PAREN_types = ["LPAR"]
     CLOSE_PAREN_types = ["RPAR"]
@@ -20,22 +18,20 @@ class Parser:
 
     def __init__(self, source_code, ctx):
         if not source_code:
-            raise
+            raise ValueError("Source code cannot be empty")
 
         self.source_code = source_code
         self.ctx = ctx
         self.id_alloc = ctx["id_alloc"]
 
-        self.ast_tree = []
+        self.ast_tree = None
         self.parser = None
-
-        self.run()
 
     def error(self, error):
         raise error
 
-    def run(self):
-        self.parser = Lark.open(
+    def parse_native(self):
+        self.parser = LarkLoader.Lark.open(
             str(self.grammar_path),
             parser="lalr",
             lexer="basic",
@@ -52,3 +48,27 @@ class Parser:
             self.error(e)
 
         return self.ast_tree
+
+    def parse_standalone(self):
+        self.parser = LarkLoader.Lark_StandAlone()
+
+        translator = ASTTranslator(
+            visit_tokens=True,
+            id_alloc=self.id_alloc,
+            source=self.source_code,
+        )
+
+        try:
+            # self.ast_tree = translator.transform(self.parser.parse(self.source_code))
+            pass
+        except Exception as e:
+            self.error(e)
+
+        return self.ast_tree
+
+    def run(self):
+        is_standalone = LarkLoader.is_standalone
+        if is_standalone:
+            return self.parse_standalone()
+        else:
+            return self.parse_native()

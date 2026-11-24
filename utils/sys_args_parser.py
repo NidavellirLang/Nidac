@@ -197,6 +197,15 @@ class SysArgsClass:
             help="Log symbol attribute assignments",
         )
 
+        parser.add_argument(
+            "-pmd",
+            "--parser-mode",
+            choices=("standalone", "dynamic"),
+            default="standalone",
+            metavar="MODE",
+            help="Parser backend (default: standalone)",
+        )
+
         parsed, _ = parser.parse_known_args(args)
 
         temp_dir = Path(tempfile.gettempdir())

@@ -1,9 +1,11 @@
-from lark import Transformer, Token
+from .lark_loader import LarkLoader
 from ..base import *
 from utils.errors import *
 
+Token = LarkLoader.Token
 
-class ASTTranslator(Transformer):
+
+class ASTTranslator(LarkLoader.Transformer):
     def __init__(self, id_alloc=None, source=None, **kwargs):
         super().__init__(**kwargs)
         self.id_alloc = id_alloc

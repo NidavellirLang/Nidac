@@ -1,201 +1,233 @@
 %import common.WS_INLINE
 
+%import common.SH_COMMENT
+
 %ignore WS_INLINE
+
+%ignore SH_COMMENT
 
 %declare _INDENT _DEDENT
 
-start: (_NEWLINE | simple_stmt _NEWLINE | compound_stmt)* simple_stmt?
+// ============================================================
 
-// ---- MAIN ---- //
+// PROGRAM
 
-expr: binary_op
+// ============================================================
 
-field_access: (call | NAME) "." NAME
+start: (_NEWLINE | statement)*
 
-?access: NAME
-    | field_access
+?statement: decorated_stmt
+    | compound_stmt
+    | simple_stmt _NEWLINE?
 
-target: access
+suite: _NEWLINE _INDENT statement+ _DEDENT
 
-variable: access
+// ============================================================
 
-?typed_name: NAME? NAME
+// DECORATORS
 
-?atom: NUMBER
-    | "(" expr ")"
-    | STR
-    | BOOL
+// ============================================================
 
-simple_stmt: assignment
-    | call
-    | return
-    | pass
-    | continue
-    | break
+decorated_stmt: decorator+ (function_def | class_def)
+
+decorator: "@" dotted_name ["(" [arguments] ")"] _NEWLINE
+
+dotted_name: NAME ("." NAME)*
+
+// ============================================================
+
+// STATEMENTS
+
+// ============================================================
+
+?simple_stmt: expr_stmt
+    | return_stmt
+    | break_stmt
+    | continue_stmt
+    | pass_stmt
+    | import_stmt
+    | from_import_stmt
 
 ?compound_stmt: function_def
-    | class
-    | if
-    | for
-    | while
+    | class_def
+    | if_stmt
+    | while_stmt
+    | for_stmt
 
-stmt: simple_stmt
-    | compound_stmt
+// ------------------------------------------------------------
 
-// STMTS
+// Definitions
 
-assignment: NAME? target (aug_assign_op | ASSIGN_OP) expr
+// ------------------------------------------------------------
 
-function_def: "def" typed_name "(" func_args? ")" ":" suite
+function_def: "def" [type_spec] NAME "(" [func_args] ")" ":" suite
 
-class: "class" NAME ":" suite
+func_args: typed_name ("," typed_name)* [","]
 
-if: "if" expr ":" suite elifs? else?
+typed_name: [type_spec] NAME
 
-for: "for" typed_name "in" expr ":" suite
+type_spec: type_name STAR*
 
-while: "while" expr ":" suite
+type_name: NAME
 
-return: "return" expr?
+class_def: "class" NAME ":" suite
 
-break: "break"
+// ------------------------------------------------------------
 
-continue: "continue"
+// Control flow
 
-pass: "pass"
+// ------------------------------------------------------------
 
-// Exprs
+if_stmt: "if" expr ":" suite elif_clause* [else_clause]
 
-call: target "(" call_args? ")"
+elif_clause: "elif" expr ":" suite
 
-// STMT HELPERS
+else_clause: "else" ":" suite
 
-suite: _NEWLINE _INDENT (_NEWLINE | simple_stmt _NEWLINE | compound_stmt)* simple_stmt? _DEDENT
+while_stmt: "while" expr ":" suite
 
-elif: "elif" expr ":" suite
+for_stmt: "for" target "in" expr ":" suite
 
-elifs: elif+
+return_stmt: "return" [expr]
 
-else: "else" ":" suite
+break_stmt: "break"
 
-ASSIGN_OP: "="
+continue_stmt: "continue"
 
-aug_assign_op: ADD ASSIGN_OP
-    | SUB ASSIGN_OP
-    | MUL ASSIGN_OP
-    | DIV ASSIGN_OP
-    | MOD ASSIGN_OP
+pass_stmt: "pass"
 
-// EXPR HELPERS
+// ============================================================
 
-call_args: expr ("," expr)*
+// ASSIGNMENT
 
-func_args: typed_name ("," typed_name)*
+// ============================================================
 
-?postfix: atom
-    | variable
+expr_stmt: type_decl
+    | expr [assignment_suffix]
 
-// LEXICAL
+type_decl: NAME STAR* NAME [ASSIGN expr]
 
-_NEWLINE: (/\r?\n[\t ]*/)+
+assignment_suffix: aug_assign_op expr
+    | ASSIGN expr
 
-// BinaryOP
+aug_assign_op: AUG_ASSIGN
 
-?binary_op: logical_or
+// ============================================================
 
-?logical_or: logical_or OR logical_and
-    | logical_and
+// IMPORTS
 
-?logical_and: logical_and AND comparison
+// ============================================================
+
+import_stmt: "import" dotted_name ["as" NAME]
+
+from_import_stmt: "from" dotted_name "import" import_symbols
+
+import_symbols: import_symbol ("," import_symbol)*
+
+import_symbol: NAME ["as" NAME]
+
+// ============================================================
+
+// EXPRESSIONS
+
+// ============================================================
+
+?expr: or_expr
+
+?or_expr: or_expr "or" and_expr
+    | and_expr
+
+?and_expr: and_expr "and" not_expr
+    | not_expr
+
+?not_expr: "not" not_expr -> logical_not
     | comparison
 
-?comparison: arithmetic (comparison_op arithmetic)*
+?comparison: comparison comparison_op sum_expr
+    | sum_expr
 
-?arithmetic: arithmetic arithmetic_op term
+comparison_op: "=="
+    | "!="
+    | "<"
+    | ">"
+    | "<="
+    | ">="
+    | "is" ["not"]
+    | ["not"] "in"
+
+?sum_expr: sum_expr "+" term
+    | sum_expr "-" term
     | term
 
-?term: term term_op unary
+?term: term "*" unary
+    | term "/" unary
+    | term "%" unary
     | unary
 
-?unary: unary_op unary
+?unary: ("+" | "-") unary -> unary_op
     | postfix
 
-// Operators
+// ============================================================
 
-logical_op: OR
-    | AND
+// POSTFIX
 
-comparison_op: EQ
-    | NE
-    | LT
-    | GT
-    | LE
-    | GE
-    | IS_NOT
-    | IS
-    | NOT_IN
-    | IN
+// ============================================================
 
-arithmetic_op: ADD
-    | SUB
+?postfix: atom postfix_part*
 
-term_op: MUL
-    | DIV
-    | MOD
+?postfix_part: "." NAME -> attr_part
+    | "[" expr "]" -> index_part
+    | "(" [arguments] ")" -> call_part
 
-unary_op: ADD
-    | SUB
-    | NOT
+// ============================================================
 
-// Terminals
+// ATOMS
 
-STR: /"([^"\\\r\n]|\\.)*"|'([^'\\\r\n]|\\.)*'/
+// ============================================================
 
-NAME: /[a-zA-Z_][a-zA-Z0-9_]*/
+?atom: NUMBER
+    | STRING
+    | "True" -> true
+    | "False" -> false
+    | "None" -> none
+    | name
+    | list_literal
+    | "(" expr ")"
+
+name: NAME
+
+list_literal: "[" [arguments] "]"
+
+arguments: expr ("," expr)* [","]
+
+// ============================================================
+
+// TARGET
+
+// ============================================================
+
+target: postfix
+
+// ============================================================
+
+// TERMINALS
+
+// ============================================================
+
+_NEWLINE: (/\r?\n[\t ]*/ | SH_COMMENT)+
+
+STAR: "*"
+
+ASSIGN: "="
+
+AUG_ASSIGN.2: "+="
+    | "-="
+    | "*="
+    | "/="
+    | "%="
+
+STRING: /"([^"\\\r\n]|\\.)*"|'([^'\\\r\n]|\\.)*'/
 
 NUMBER: /[0-9]+/
 
-ADD: "+"
-
-SUB: "-"
-
-MUL: "*"
-
-DIV: "/"
-
-MOD: "%"
-
-EQ: "=="
-
-NE: "!="
-
-LT: "<"
-
-GT: ">"
-
-LE: "<="
-
-GE: ">="
-
-IS_NOT: "is" "not"
-
-IS: "is"
-
-NOT: "not"
-
-NOT_IN: "not" "in"
-
-IN: "in"
-
-OR: "or"
-
-AND: "and"
-
-BOOL: "True"
-    | "False"
-
-COMMENT: /#[^\n]*/
-
-%ignore COMMENT
-
-%ignore COMMENT
+NAME: /[a-zA-Z_][a-zA-Z0-9_]*/

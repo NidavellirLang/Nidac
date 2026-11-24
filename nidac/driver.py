@@ -59,6 +59,7 @@ class Nidac:
         timer.start("Parser")
         self.parse()
         if SysArgs.stop_after == "ast":
+            timer.print()
             return
 
         timer.start("Import Systems")
