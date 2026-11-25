@@ -1,7 +1,7 @@
 from utils import SysArgs
 from utils.errors import NidavellirFileNotFoundError, NidavellirInternalError
 from pathlib import Path
-import os, sys
+import sys
 
 try:
     from lark import Lark
