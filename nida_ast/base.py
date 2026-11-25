@@ -125,7 +125,7 @@ class IndexAccessAST(AST):
 @dataclass(slots=True, repr=False)
 class CallAST(AST):
     target: IdentifierAST | FieldAccessAST
-    args: list
+    arguments: list
 
 
 @dataclass(slots=True, repr=False)
@@ -214,7 +214,7 @@ class DecoratorAST(AST):
 @dataclass(slots=True, repr=False)
 class FieldAccessAST(AST):
     target: AST
-    field: IdentifierAST
+    access: IdentifierAST
 
 
 @dataclass(slots=True, repr=False)
@@ -233,7 +233,7 @@ class IntrinsicAST(AST):
 class IntrinsicCallAST(AST):
     intrinsic: IntrinsicAST
     name: str
-    args: list
+    arguments: list
 
 
 @dataclass(slots=True, repr=False)

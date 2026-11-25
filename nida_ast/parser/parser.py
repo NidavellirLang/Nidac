@@ -30,7 +30,7 @@ class Parser:
     def error(self, error):
         raise error
 
-    def parse_native(self):
+    def parse_dynamic(self):
         self.parser = LarkLoader.Lark.open(
             str(self.grammar_path),
             parser="lalr",
@@ -38,9 +38,10 @@ class Parser:
             start="start",
             propagate_positions=True,
             postlex=NidaIndenter(),
-            # transformer=ASTTranslator(
-            #     visit_tokens=True, id_alloc=self.id_alloc, source=self.source_code
-            # ),
+            maybe_placeholders=False,
+            transformer=ASTTranslator(
+                visit_tokens=True, id_alloc=self.id_alloc, source=self.source_code
+            ),
         )
         try:
             self.ast_tree = self.parser.parse(self.source_code)
@@ -71,4 +72,4 @@ class Parser:
         if is_standalone:
             return self.parse_standalone()
         else:
-            return self.parse_native()
+            return self.parse_dynamic()

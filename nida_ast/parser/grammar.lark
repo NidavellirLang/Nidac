@@ -10,17 +10,78 @@
 
 // ============================================================
 
+// NAME ROLES
+
+// ============================================================
+
+// Her NAME kullanımı, bulunduğu sözdizimsel bağlama göre ayrı bir
+
+// kural altında toplanır. Böylece parser ağacında rol zaten bellidir
+
+// ve transformer'ın tahmin yapmasına gerek kalmaz.
+
+//
+
+//   var_ref        -> değer olarak okunan değişken      (x + 1)
+
+//   var_target     -> atama hedefi olan değişken        (x = 1, int x = 1, for x in ...)
+
+//   var_decl_name  -> değersiz bildirilen değişken adı  (int x)
+
+//   param_name     -> fonksiyon parametre adı
+
+//   func_name      -> fonksiyon tanım adı
+
+//   class_name     -> sınıf tanım adı
+
+//   type_name      -> tip adı
+
+//   member_name    -> "." sonrası üye adı               (a.member)
+
+//   module_name    -> import/dekoratör yolundaki adlar
+
+//   bind_name      -> import ile bağlanan yeni ad       (import x as BIND)
+
+var_ref: NAME
+
+var_target: NAME
+
+var_decl_name: NAME
+
+param_name: NAME
+
+func_name: NAME
+
+class_name: NAME
+
+type_name.2: NAME
+
+member_name: NAME
+
+module_name: NAME
+
+symbol_name: NAME
+
+bind_name: NAME
+
+// ============================================================
+
 // PROGRAM
 
 // ============================================================
 
-start: (_NEWLINE | statement)*
+start: (_NEWLINE | statement)* simple_stmt?
 
 ?statement: decorated_stmt
     | compound_stmt
-    | simple_stmt _NEWLINE?
+    | simple_stmt _NEWLINE
 
-suite: _NEWLINE _INDENT statement+ _DEDENT
+// Son statement'ın sonunda newline olmak zorunda değil (dosya sonu / blok sonu).
+
+suite: _NEWLINE _INDENT _block _DEDENT
+
+_block: statement+
+    | statement* simple_stmt
 
 // ============================================================
 
@@ -32,7 +93,7 @@ decorated_stmt: decorator+ (function_def | class_def)
 
 decorator: "@" dotted_name ["(" [arguments] ")"] _NEWLINE
 
-dotted_name: NAME ("." NAME)*
+dotted_name: module_name ("." module_name)*
 
 // ============================================================
 
@@ -60,17 +121,15 @@ dotted_name: NAME ("." NAME)*
 
 // ------------------------------------------------------------
 
-function_def: "def" [type_spec] NAME "(" [func_args] ")" ":" suite
+function_def: "def" [type_spec] func_name "(" [func_args] ")" ":" suite
 
 func_args: typed_name ("," typed_name)* [","]
 
-typed_name: [type_spec] NAME
+typed_name: [type_spec] param_name
 
-type_spec: type_name STAR*
+type_spec: type_name MUL*
 
-type_name: NAME
-
-class_def: "class" NAME ":" suite
+class_def: "class" class_name ":" suite
 
 // ------------------------------------------------------------
 
@@ -86,7 +145,24 @@ else_clause: "else" ":" suite
 
 while_stmt: "while" expr ":" suite
 
-for_stmt: "for" target "in" expr ":" suite
+for_stmt: "for" for_target IN expr ":" suite
+
+// for hedefi: atama hedefiyle aynı ağacı üretir ama NAME için ayrı
+
+// bir kural kullanır; böylece LALR "for x in" ile "x in y" karşılaştırmasını
+
+// birbirine karıştırmaz.
+
+?for_target: var_target
+    | for_chain "." member_name -> attr_access
+    | for_chain "[" expr "]" -> index_access
+
+?for_chain: for_base
+    | for_chain "." member_name -> attr_access
+    | for_chain "[" expr "]" -> index_access
+    | for_chain "(" [arguments] ")" -> call
+
+for_base: NAME -> var_ref
 
 return_stmt: "return" [expr]
 
@@ -94,7 +170,7 @@ break_stmt: "break"
 
 continue_stmt: "continue"
 
-pass_stmt: "pass"
+pass_stmt: PASS
 
 // ============================================================
 
@@ -102,15 +178,59 @@ pass_stmt: "pass"
 
 // ============================================================
 
-expr_stmt: type_decl
-    | expr [assignment_suffix]
+// NOT: Statement başında "NAME * NAME" hem tip bildirimi (T* x) hem de
 
-type_decl: NAME STAR* NAME [ASSIGN expr]
+// çarpma ifadesi (a * b) olabilir. Bu gerçek bir belirsizlik (C'deki
 
-assignment_suffix: aug_assign_op expr
-    | ASSIGN expr
+// aynı sorun). Burada bildirim kazanır (type_name.2). Yani statement
 
-aug_assign_op: AUG_ASSIGN
+// BAŞINDA "a * b" yazılan bir ifade ifadesi artık bildirim olarak
+
+// okunur; bunun dışındaki yerlerde (return a * b, x = a * b, ...) çarpma
+
+// normal çalışır.
+
+// Tip, assignment'ın opsiyonel ilk çocuğudur: "a = 1" ve "int a = 1" aynı
+
+// assignment düğümünü üretir, fark yalnızca type_spec çocuğunun olup
+
+// olmamasıdır. Tip yalnızca değişken hedefinden önce yazılabilir
+
+// ("int a.b = 1" geçersiz). Value zorunludur; değersiz bildirim ("int a")
+
+// ayrı bir kuraldır.
+
+declaration: type_spec var_decl_name
+
+?expr_stmt: declaration
+    | assignment
+    | expr
+
+assignment: type_spec? var_target assignment_suffix
+    | member_target assignment_suffix
+
+?assignment_suffix: ASSIGN _assignment_chain
+    | AUG_ASSIGN expr
+
+_assignment_chain: chain_target (ASSIGN chain_target)* ASSIGN expr
+    | expr
+
+// Zincirdeki sonraki hedefler tipsizdir (a = b = 1). Tipli olamamaları
+
+// "x = a * b" gibi ifadelerde "a *" kısmının tip sanılmasını da önler.
+
+?chain_target: NAME -> var_target
+    | postfix_expr "." member_name -> attr_access
+    | postfix_expr "[" expr "]" -> index_access
+
+// ------------------------------------------------------------
+
+// Assignment targets
+
+// ------------------------------------------------------------
+
+?member_target: postfix_expr "." member_name -> attr_access
+    | postfix_expr "[" expr "]" -> index_access
 
 // ============================================================
 
@@ -118,13 +238,13 @@ aug_assign_op: AUG_ASSIGN
 
 // ============================================================
 
-import_stmt: "import" dotted_name ["as" NAME]
+import_stmt: "import" dotted_name [AS bind_name]
 
 from_import_stmt: "from" dotted_name "import" import_symbols
 
 import_symbols: import_symbol ("," import_symbol)*
 
-import_symbol: NAME ["as" NAME]
+import_symbol: symbol_name [AS bind_name]
 
 // ============================================================
 
@@ -134,38 +254,38 @@ import_symbol: NAME ["as" NAME]
 
 ?expr: or_expr
 
-?or_expr: or_expr "or" and_expr
+?or_expr: or_expr OR and_expr
     | and_expr
 
-?and_expr: and_expr "and" not_expr
+?and_expr: and_expr AND not_expr
     | not_expr
 
-?not_expr: "not" not_expr -> logical_not
+?not_expr: NOT not_expr -> logical_not
     | comparison
 
 ?comparison: comparison comparison_op sum_expr
     | sum_expr
 
-comparison_op: "=="
-    | "!="
-    | "<"
-    | ">"
-    | "<="
-    | ">="
-    | "is" ["not"]
-    | ["not"] "in"
+?comparison_op: EQ
+    | NE
+    | LT
+    | GT
+    | LE
+    | GE
+    | IS [NOT]
+    | [NOT] IN
 
-?sum_expr: sum_expr "+" term
-    | sum_expr "-" term
+?sum_expr: sum_expr ADD term
+    | sum_expr SUB term
     | term
 
-?term: term "*" unary
-    | term "/" unary
-    | term "%" unary
+?term: term MUL unary
+    | term DIV unary
+    | term MOD unary
     | unary
 
-?unary: ("+" | "-") unary -> unary_op
-    | postfix
+?unary: (ADD | SUB) unary -> unary_op
+    | postfix_expr
 
 // ============================================================
 
@@ -173,11 +293,10 @@ comparison_op: "=="
 
 // ============================================================
 
-?postfix: atom postfix_part*
-
-?postfix_part: "." NAME -> attr_part
-    | "[" expr "]" -> index_part
-    | "(" [arguments] ")" -> call_part
+?postfix_expr: atom
+    | postfix_expr "." member_name -> attr_access
+    | postfix_expr "[" expr "]" -> index_access
+    | postfix_expr "(" [arguments] ")" -> call
 
 // ============================================================
 
@@ -190,23 +309,13 @@ comparison_op: "=="
     | "True" -> true
     | "False" -> false
     | "None" -> none
-    | name
+    | var_ref
     | list_literal
     | "(" expr ")"
-
-name: NAME
 
 list_literal: "[" [arguments] "]"
 
 arguments: expr ("," expr)* [","]
-
-// ============================================================
-
-// TARGET
-
-// ============================================================
-
-target: postfix
 
 // ============================================================
 
@@ -216,7 +325,41 @@ target: postfix
 
 _NEWLINE: (/\r?\n[\t ]*/ | SH_COMMENT)+
 
-STAR: "*"
+PASS: "pass"
+
+ADD: "+"
+
+SUB: "-"
+
+MUL: "*"
+
+DIV: "/"
+
+MOD: "%"
+
+EQ: "=="
+
+NE: "!="
+
+LT: "<"
+
+GT: ">"
+
+LE: "<="
+
+GE: ">="
+
+AND: "and"
+
+OR: "or"
+
+IS: "is"
+
+NOT: "not"
+
+IN: "in"
+
+AS: "as"
 
 ASSIGN: "="
 

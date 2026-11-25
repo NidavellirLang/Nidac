@@ -9,7 +9,6 @@ class _LarkLoader:
 
         self._modules = []
         self.is_standalone = False
-        self.parser = None
 
         self._load()
 
@@ -64,10 +63,10 @@ class _LarkLoader:
         self.is_standalone = is_standalone
 
         if SysArgs.verbose_logs:
-            print("Selected parser:  ", "Native" if is_standalone else "Default")
+            print("Selected parser:  ", "Native" if is_standalone else "Dynamic")
             print(
                 "Requested parser: ",
-                "Default" if self.requested_mode == "dynamic" else "Native",
+                "Dynamic" if self.requested_mode == "dynamic" else "Native",
             )
 
     def _get(self, key):

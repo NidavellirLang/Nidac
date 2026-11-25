@@ -1,8 +1,10 @@
 from .lark_loader import LarkLoader
 from ..base import *
+from .parse_nodes import *
 from utils.errors import *
 
 Token = LarkLoader.Token
+Tree = LarkLoader.Tree
 
 
 class ASTTranslator(LarkLoader.Transformer):
@@ -12,7 +14,7 @@ class ASTTranslator(LarkLoader.Transformer):
         self.source = source
 
     # ---------------------
-    # ------ Heplers ------
+    # ------ Helpers ------
     # ---------------------
 
     def alloc_id(self):
@@ -66,94 +68,185 @@ class ASTTranslator(LarkLoader.Transformer):
             line=self._token_line(token),
         )
 
-    def access(self, children):
-        if len(children) == 1:
-            return IdentifierAST(
-                name=str(children[0]),
-                node_id=self.alloc_id(),
-                line=self._token_line(children[0]),
-            )
+    def name(self, children):
+        return children[0]
 
-        return FieldAccessAST(
-            target=children[0],
-            field=IdentifierAST(
-                name=str(children[1]),
-                node_id=self.alloc_id(),
-                line=self._token_line(children[0]),
+    def var_target(self, children):
+        token = children[0]
+
+        return IdentifierAST(
+            name=str(token),
+            node_id=self.alloc_id(),
+            line=self._token_line(token),
+        )
+
+    def member_name(self, children):
+        return self.var_target(children)
+
+    def var_ref(self, children):
+        token = children[0]
+
+        return VariableAST(
+            name=str(token),
+            node_id=self.alloc_id(),
+            line=self._token_line(token),
+        )
+
+    def _build_target(self, target):
+        if isinstance(target, Tree):
+            return self.visit(target)
+
+        return target
+
+    def arguments(self, children):
+        return list(children)
+
+    def _create(self, cls, start, end=None, **kwargs):
+        return cls(
+            **kwargs,
+            node_id=self.alloc_id(),
+            line=(
+                self._span_line(start, end)
+                if end is not None
+                else self._get_line(start)
             ),
-            line=self._token_line(children[0]),
         )
 
-    def typed_access(self, children):
-        if len(children) == 1:
-            return None, children[0]
+    def _line(self, start, end=None):
+        if end is None:
+            return self._get_line(start)
 
-        return children[0], children[1]
-
-    def arithmetic_op(self, children):
-        return str(children[0])
-
-    def term_op(self, children):
-        return str(children[0])
-
-    def arithmetic(self, children):
-        if len(children) == 1:
-            return children[0]
-
-        left, operator, right = children
-
-        return BinaryOpAST(
-            left=left,
-            op=str(operator),
-            right=right,
-            node_id=self.alloc_id(),
-            line=self._span_line(left, right),
-        )
-
-    def term(self, children):
-        if len(children) == 1:
-            return children[0]
-
-        left, operator, right = children
-
-        return BinaryOpAST(
-            left=left,
-            operator=str(operator),
-            right=right,
-            node_id=self.alloc_id(),
-            line=self._span_line(left, right),
-        )
-
-    def call_args(self, children):
-        return children
+        return self._span_line(start, end)
 
     def call(self, children):
         target = children[0]
-        args = children[1] if len(children) > 1 else []
+        arguments = children[1] if len(children) > 1 else []
 
-        return CallAST(
+        end = arguments[-1] if arguments else target
+
+        return self._create(
+            CallAST,
+            target,
+            end,
             target=target,
-            args=args,
-            node_id=self.alloc_id(),
-            line=self._span_line(target, args[-1] if args else target),
+            arguments=arguments,
         )
+
+    def func_name(self, children):
+        token = children[0]
+
+        return IdentifierAST(
+            name=str(token),
+            node_id=self.alloc_id(),
+            line=self._token_line(token),
+        )
+
+    def type_spec(self, children):
+        type = children[0].children[0]
+        return Type(value=str(type), line=self._line(type))
+
+    def func_args(self, children):
+        return FuncArgs(list(children))
+
+    def param_name(self, children):
+        return children[0]
+
+    def _create_func_param(self, args):
+        formatted_args = []
+        for arg in args:
+            child = arg.children
+            if len(child) == 2:
+                type, name = child
+            elif len(child) == 1:
+                name = child[0]
+                type = None
+            else:
+                raise NidavellirSyntaxError(
+                    "Invalid function argument", self._get_line(arg)
+                )
+
+            identifier = self._create(IdentifierAST, name, name=str(name))
+            formatted_args.append(
+                self._create(
+                    AssignAST,
+                    identifier,
+                    type,
+                    target=identifier,
+                    value=None,
+                    type=type.value if type is not None else None,
+                )
+            )
+
+        return formatted_args
+
+    def suite(self, children):
+        return Body(children)
+
+    def function_def(self, children):
+        return_type = None
+        name = None
+        args = []
+        body = []
+
+        for child in children:
+            if isinstance(child, FuncArgs):
+                args = child.values
+            elif isinstance(child, IdentifierAST):
+                name = child
+            elif isinstance(child, Type):
+                return_type = child
+            elif isinstance(child, Body):
+                body = child.body
+
+        args = self._create_func_param(args)
+
+        if name is None:
+            raise NidavellirSyntaxError(
+                "Function name is missing",
+                self._get_line(children[0]),
+            )
+
+        return FunctionAST(
+            name=name,
+            body=body,
+            args=args,
+            type=return_type.value if return_type is not None else None,
+        )
+
+    def attr_access(self, children):
+        return self._create(
+            FieldAccessAST,
+            children[0],
+            children[1],
+            target=children[0],
+            access=children[1],
+        )
+
+    def pass_stmt(self, children):
+        return self._create(PassAST, start=children[0])
+
+    def assignment_suffix(self, children):
+        return children[1]
 
     def assignment(self, children):
-        # TODO: impl operator
-        typed_access, operator, value = children
+        if len(children) == 2:
+            target, value = children
+            type = None
+        elif len(children) == 3:
+            type_node, target, value = children
+            type = self._type_format(type_node)
+        else:
+            line = self._get_line(children[0]) if children else None
+            raise NidavellirSyntaxError(
+                f"Invalid assignment structure: expected 2 or 3 children, got {len(children)}",
+                line,
+            )
 
-        type_name, target = typed_access
-
-        if type_name is not None:
-            type_name = str(type_name)
-
-        return AssignAST(
+        return self._create(
+            AssignAST,
+            target,
+            value,
             target=target,
             value=value,
-            type=type_name,
-            node_id=self.alloc_id(),
-            line=self._span_line(typed_access[0] or target, value),
+            type=type,
         )
-
-    def simple_stmt(self, children):
-        return children[0]
