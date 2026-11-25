@@ -94,11 +94,16 @@ class ElifAST(AST):
 
 
 @dataclass(slots=True, repr=False)
+class ElseAST(AST):
+    body: list
+
+
+@dataclass(slots=True, repr=False)
 class IfAST(AST):
     cond: AST
     body: list
     elifs: list
-    else_body: list
+    elses: ElseAST | None
 
 
 @dataclass(slots=True, repr=False)

@@ -8,11 +8,14 @@ from pathlib import Path
 
 
 class SysArgsClass:
+    grammar_path = Path(__file__).parent.parent / "nida_ast" / "parser" / "grammar.lark"
 
     def __init__(self, args=None):
 
         if args is None:
             args = sys.argv[1:]
+
+        self.grammar = False
 
         parser = argparse.ArgumentParser(
             prog="nidavellir",
@@ -205,6 +208,41 @@ class SysArgsClass:
             metavar="MODE",
             help="Parser backend (default: standalone)",
         )
+
+        # Grammar Management
+        if args and args[0] == "grammar":
+            self.grammar = True
+            grammar_commands = parser.add_subparsers(
+                dest="grammar_command",
+                required=True,
+            )
+
+            grammar_commands.add_parser(
+                "compile",
+                help="Compile the grammar",
+            )
+
+            grammar_commands.add_parser(
+                "update",
+                help="Update the grammar",
+            )
+
+            grammar_commands.add_parser(
+                "remove",
+                help="Remove the compiled grammar",
+            )
+
+            grammar_commands.add_parser(
+                "check",
+                help="Check grammar validity",
+            )
+
+            parsed = parser.parse_args(args[1:])
+            parsed.command = "grammar"
+
+            self.__dict__.update(vars(parsed))
+            self.extra_c_includes = []
+            return
 
         parsed, _ = parser.parse_known_args(args)
 

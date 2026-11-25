@@ -68,6 +68,9 @@ class ASTTranslator(LarkLoader.Transformer):
             line=self._token_line(token),
         )
 
+    def STRING(self, token):
+        return self._create(StringAST, token, value=str(token))
+
     def name(self, children):
         return children[0]
 
@@ -182,6 +185,161 @@ class ASTTranslator(LarkLoader.Transformer):
     def suite(self, children):
         return Body(children)
 
+    def for_stmt(self, children):
+        if isinstance(children[0], Type):
+            type, target, _, source, body = children
+        else:
+            target, _, source, body = children
+            type = None
+
+        formatted_target = self._create(
+            AssignAST,
+            target,
+            target=target,
+            value=None,
+            type=type.value if type is not None else None,
+        )
+
+        return self._create(
+            ForAST,
+            formatted_target,
+            body.body[-1],
+            target=formatted_target,
+            source=source,
+            body=body.body,
+        )
+
+    def return_stmt(self, children):
+        if len(children) == 1:
+            return self._create(ReturnAST, start=children[0], value=None)
+        elif len(children) == 2:
+            return self._create(
+                ReturnAST, start=children[0], end=children[1], value=children[1]
+            )
+        else:
+            raise NidavellirSyntaxError(
+                "Invalid return statement", self._get_line(children[0])
+            )
+
+    def break_stmt(self, children):
+        return self._create(BreakAST, start=children[0])
+
+    def continue_stmt(self, children):
+        return self._create(ContinueAST, start=children[0])
+
+    def else_clause(self, children):
+        body = children[0]
+        return self._create(
+            ElseAST,
+            body.body[-1],
+            body=body.body,
+        )
+
+    def elif_clause(self, children):
+        cond = children[0]
+        body = children[1]
+        return self._create(ElifAST, cond, body.body[-1], cond=cond, body=body.body)
+
+    def if_stmt(self, children):
+        cond = children[0]
+        body = children[1]
+        elifs = []
+        elses = None
+
+        for child in children[2:]:
+            if isinstance(child, ElifAST):
+                elifs.append(child)
+            elif isinstance(child, ElseAST):
+                if elses is not None:
+                    raise NidavellirSyntaxError(
+                        "Multiple else clauses", self._get_line(child)
+                    )
+
+                elses = child
+            else:
+                raise NidavellirSyntaxError(
+                    "Invalid if statement", self._get_line(child)
+                )
+
+        return self._create(
+            IfAST,
+            cond,
+            body.body[-1],
+            cond=cond,
+            body=body.body,
+            elifs=elifs,
+            elses=elses,
+        )
+
+    def _binary_op(self, children):
+        left, op, right = children
+        return self._create(
+            BinaryOpAST,
+            left,
+            right,
+            left=left,
+            right=right,
+            op=op,
+        )
+
+    def or_expr(self, children):
+        return self._binary_op(children)
+
+    def sum_expr(self, children):
+        return self._binary_op(children)
+
+    def comparison(self, children):
+        return self._binary_op(children)
+
+    def comparison_op(self, children):
+        if len(children) == 1:
+            return str(children[0])
+        elif len(children) == 2:
+            return str(children[0] + " " + children[1])
+        else:
+            raise NidavellirSyntaxError(
+                "Invalid comparison operator", self._get_line(children[0])
+            )
+
+    def _boolean(self, start, value: bool):
+        return self._create(BooleanAST, start=start, value=value)
+
+    def true(self, children):
+        return self._boolean(children[0], True)
+
+    def false(self, children):
+        return self._boolean(children[0], False)
+
+    def none(self, children):
+        return self._create(NoneAST, start=children[0])
+
+    def while_stmt(self, children):
+        cond, body = children
+        return self._create(
+            WhileAST,
+            cond,
+            body.body[-1],
+            cond=cond,
+            body=body.body,
+        )
+
+    def class_name(self, children):
+        return children[0]
+
+    def class_def(self, children):
+        name, body = children
+        try:
+            return self._create(
+                ClassAST,
+                start=name,
+                end=body.body[-1],
+                name=name,
+                body=body.body,
+                decorators=None,
+            )
+        except:
+            raise Exception(body.body[-1])
+
     def function_def(self, children):
         return_type = None
         name = None
@@ -205,6 +363,16 @@ class ASTTranslator(LarkLoader.Transformer):
                 "Function name is missing",
                 self._get_line(children[0]),
             )
+
+        return self._create(
+            FunctionAST,
+            start=return_type or name,
+            end=body[-1],
+            name=name,
+            body=body,
+            args=args,
+            type=return_type.value if return_type is not None else None,
+        )
 
         return FunctionAST(
             name=name,
@@ -234,7 +402,7 @@ class ASTTranslator(LarkLoader.Transformer):
             type = None
         elif len(children) == 3:
             type_node, target, value = children
-            type = self._type_format(type_node)
+            type = type_node.value
         else:
             line = self._get_line(children[0]) if children else None
             raise NidavellirSyntaxError(

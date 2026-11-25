@@ -1,4 +1,5 @@
 from pathlib import Path
+from utils import SysArgs
 from .transformer import ASTTranslator
 
 from .lark_loader import LarkLoader
@@ -14,11 +15,12 @@ class NidaIndenter(LarkLoader.Indenter):
 
 
 class Parser:
-    grammar_path = Path(__file__).parent / "grammar.lark"
 
     def __init__(self, source_code, ctx):
         if not source_code:
             raise ValueError("Source code cannot be empty")
+
+        self.grammar_path = SysArgs.grammar_path
 
         self.source_code = source_code
         self.ctx = ctx

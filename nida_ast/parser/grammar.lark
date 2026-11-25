@@ -145,7 +145,7 @@ else_clause: "else" ":" suite
 
 while_stmt: "while" expr ":" suite
 
-for_stmt: "for" for_target IN expr ":" suite
+for_stmt: "for" type_spec? var_target IN expr ":" suite
 
 // for hedefi: atama hedefiyle aynı ağacı üretir ama NAME için ayrı
 
@@ -164,11 +164,11 @@ for_stmt: "for" for_target IN expr ":" suite
 
 for_base: NAME -> var_ref
 
-return_stmt: "return" [expr]
+return_stmt: RETURN [expr]
 
-break_stmt: "break"
+break_stmt: BREAK
 
-continue_stmt: "continue"
+continue_stmt: CONTINUE
 
 pass_stmt: PASS
 
@@ -306,9 +306,9 @@ import_symbol: symbol_name [AS bind_name]
 
 ?atom: NUMBER
     | STRING
-    | "True" -> true
-    | "False" -> false
-    | "None" -> none
+    | TRUE -> true
+    | FALSE -> false
+    | NONE -> none
     | var_ref
     | list_literal
     | "(" expr ")"
@@ -325,7 +325,19 @@ arguments: expr ("," expr)* [","]
 
 _NEWLINE: (/\r?\n[\t ]*/ | SH_COMMENT)+
 
+TRUE: "True"
+
+FALSE: "False"
+
+NONE: "None"
+
 PASS: "pass"
+
+RETURN: "return"
+
+BREAK: "break"
+
+CONTINUE: "continue"
 
 ADD: "+"
 

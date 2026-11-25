@@ -110,7 +110,7 @@ class Nidac:
         self.asts = parser.run()
         if SysArgs.dump_ast:
             print("===== AST =====")
-            print(self.asts)
+            print("\n".join(map(str, self.asts)))
 
         return self.asts
 
@@ -128,7 +128,7 @@ class Nidac:
 
         if SysArgs.dump_ast_after_semantic:
             print("===== AST (after semantic analysis) =====")
-            print(self.asts)
+            print("\n".join(map(str, self.asts)))
 
         return self.symbol_table
 
