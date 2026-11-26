@@ -1,4 +1,4 @@
-from nida_ast.base import *
+from AST.base import *
 from .intrinsic_types import *
 
 INTRINSICS = {

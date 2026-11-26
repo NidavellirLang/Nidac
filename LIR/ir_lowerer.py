@@ -1,4 +1,4 @@
-from IR_gen.irs import *
+from HIR.irs import *
 from .lirs import *
 from type_systems.types import *
 from .operator_rules import *

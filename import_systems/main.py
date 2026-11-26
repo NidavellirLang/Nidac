@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from nida_ast.base import *
+from AST.base import *
 from .analyzer import check_header_exists
 from utils import SysArgs
 

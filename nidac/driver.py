@@ -1,14 +1,14 @@
 from pathlib import Path
 
-from nida_ast import Parser
-from semantic import semantic_analyze
+from AST import Parser
+from semantic import Visitor
 from import_systems import ImportSystem
 
-from type_systems.main import TypeSystem
-from IR_gen import IRProcessor
-from LIR_gen import IRLowerer
-from C_gen import C_Gen
-from C_gen import HeaderGenerator
+# from type_systems.main import TypeSystem
+from HIR import IRProcessor
+from LIR import IRLowerer
+from backend.C import C_Gen
+from backend.C import HeaderGenerator
 from utils import SysArgs, ExecutionTimer
 from utils.errors import NidavellirFileNotFoundError
 from .gcc import compile_c_file, run_compiled_file
@@ -124,20 +124,19 @@ class Nidac:
         if not self.asts:
             self.parse()
 
-        self.symbol_table_b = semantic_analyze(self.asts, self.ctx)
-        self.symbol_tree = self.symbol_table_b.st
+        self.visitor = Visitor(self.ctx)
+        self.visitor.run(self.asts)
 
         if SysArgs.dump_ast_after_semantic:
             print("===== AST (after semantic analysis) =====")
             print("\n".join(map(str, self.asts)))
 
-        return self.symbol_table
-
     def type_def(self):
+        return
         if not self.symbol_tree:
             self.analyze()
 
-        TypeSystem(self.symbol_tree)
+        # TypeSystem(self.symbol_tree)
 
     # ------------------------------------------------------------------
     # Middleend

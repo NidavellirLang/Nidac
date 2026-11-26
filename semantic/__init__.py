@@ -1,3 +1,3 @@
-from .tree_systems import semantic_analyze
+from .before_type_engine import Visitor
 
-__all__ = ["semantic_analyze"]
+__all__ = ["Visitor"]

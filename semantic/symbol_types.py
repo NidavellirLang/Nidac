@@ -6,11 +6,11 @@ import traceback
 
 # from dataclasses import dataclass, fields, field as dc_field
 from dataclasses import dataclass, fields as dc_fields, field as dc_field, is_dataclass
-from nida_ast.base import AST, IntrinsicAST
+from AST.base import AST, IntrinsicAST
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from .symbol_table import Scope
+    from .before_type_engine.symbol_tree.symbol_table import Scope
 
 
 class TrackedList(list):

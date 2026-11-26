@@ -1,7 +1,7 @@
 from ..transformer import IRTransform, PassContractError, ReplaceMany
 from ...irs import *
 from ...ir_gen import IRGen
-from semantic.tree_systems.symbol_types import (
+from semantic.symbol_types import (
     AssignSymbol,
     IdentifierSymbol,
     VariableSymbol,

@@ -1,5 +1,5 @@
-from .symbol_types import *
-from nida_ast.base import *
+from ...symbol_types import *
+from AST.base import *
 from utils.errors import *
 from utils.hashability import ishashable
 

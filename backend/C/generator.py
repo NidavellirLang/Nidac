@@ -1,5 +1,5 @@
-from IR_gen.irs import *
-from LIR_gen.lirs import *
+from HIR.irs import *
+from LIR.lirs import *
 from .c_nodes import *
 from .c_types import *
 from type_systems.types import ClassType, FuncPtrType, NoneType, RefType
