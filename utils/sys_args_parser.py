@@ -203,8 +203,8 @@ class SysArgsClass:
         parser.add_argument(
             "-pmd",
             "--parser-mode",
-            choices=("standalone", "dynamic"),
-            default="standalone",
+            choices=("native", "dynamic"),
+            default=None,
             metavar="MODE",
             help="Parser backend (default: standalone)",
         )

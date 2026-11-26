@@ -27,7 +27,6 @@ from typing import Any, ClassVar
 
 from .sys_args_parser import SysArgs
 
-
 _RST = "\033[0m"
 _BOLD = "\033[1m"
 _DIM = "\033[2m"
@@ -39,7 +38,7 @@ _BLUE = "\033[34m"
 
 
 def _colors_enabled() -> bool:
-    return bool(SysArgs.verbose_logs) and sys.stdout.isatty()
+    return getattr(sys.stdout, "isatty", lambda: False)()
 
 
 def _paint(text: str, *codes: str) -> str:
@@ -107,7 +106,7 @@ class TreeReprMixin:
         entries = []
 
         for field in dc_fields(node):
-            if field.name in cls._tree_skip_fields or not field.repr:
+            if field.name in node._tree_skip_fields or not field.repr:
                 continue
 
             value = getattr(node, field.name)

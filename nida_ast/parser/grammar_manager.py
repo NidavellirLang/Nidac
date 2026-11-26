@@ -42,6 +42,7 @@ class GrammarManager:
                 grammar,
                 parser="lalr",
                 start="start",
+                maybe_placeholders=False,
             )
 
             with self.standalone_path.open("w", encoding="utf-8") as output:

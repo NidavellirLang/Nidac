@@ -171,11 +171,10 @@ class ASTTranslator(LarkLoader.Transformer):
             identifier = self._create(IdentifierAST, name, name=str(name))
             formatted_args.append(
                 self._create(
-                    AssignAST,
+                    DeclareAST,
+                    type or identifier,
                     identifier,
-                    type,
                     target=identifier,
-                    value=None,
                     type=type.value if type is not None else None,
                 )
             )
@@ -193,10 +192,9 @@ class ASTTranslator(LarkLoader.Transformer):
             type = None
 
         formatted_target = self._create(
-            AssignAST,
+            DeclareAST,
             target,
             target=target,
-            value=None,
             type=type.value if type is not None else None,
         )
 
@@ -257,9 +255,7 @@ class ASTTranslator(LarkLoader.Transformer):
 
                 elses = child
             else:
-                raise NidavellirSyntaxError(
-                    "Invalid if statement", self._get_line(child)
-                )
+                raise NidavellirSyntaxError(f"Invalid if statement {child}")
 
         return self._create(
             IfAST,
@@ -279,10 +275,13 @@ class ASTTranslator(LarkLoader.Transformer):
             right,
             left=left,
             right=right,
-            op=op,
+            op=str(op),
         )
 
     def or_expr(self, children):
+        return self._binary_op(children)
+
+    def and_expr(self, children):
         return self._binary_op(children)
 
     def sum_expr(self, children):
@@ -300,6 +299,22 @@ class ASTTranslator(LarkLoader.Transformer):
             raise NidavellirSyntaxError(
                 "Invalid comparison operator", self._get_line(children[0])
             )
+
+    def unary_op(self, children):
+        op, left = children
+        return self._create(
+            UnaryOpAST,
+            op,
+            left,
+            right=left,
+            op=str(op),
+        )
+
+    def logical_not(self, children):
+        return self.unary_op(children)
+
+    def term(self, children):
+        return self._binary_op(children)
 
     def _boolean(self, start, value: bool):
         return self._create(BooleanAST, start=start, value=value)
@@ -326,19 +341,23 @@ class ASTTranslator(LarkLoader.Transformer):
     def class_name(self, children):
         return children[0]
 
+    def _name_to_identifier(self, token):
+        return self._create(
+            IdentifierAST,
+            token,
+            name=str(token),
+        )
+
     def class_def(self, children):
         name, body = children
-        try:
-            return self._create(
-                ClassAST,
-                start=name,
-                end=body.body[-1],
-                name=name,
-                body=body.body,
-                decorators=None,
-            )
-        except:
-            raise Exception(body.body[-1])
+        return self._create(
+            ClassAST,
+            start=name,
+            end=body.body[-1],
+            name=self._name_to_identifier(name),
+            body=body.body,
+            decorators=None,
+        )
 
     def function_def(self, children):
         return_type = None
@@ -374,13 +393,6 @@ class ASTTranslator(LarkLoader.Transformer):
             type=return_type.value if return_type is not None else None,
         )
 
-        return FunctionAST(
-            name=name,
-            body=body,
-            args=args,
-            type=return_type.value if return_type is not None else None,
-        )
-
     def attr_access(self, children):
         return self._create(
             FieldAccessAST,
@@ -392,6 +404,24 @@ class ASTTranslator(LarkLoader.Transformer):
 
     def pass_stmt(self, children):
         return self._create(PassAST, start=children[0])
+
+    def var_decl_name(self, children):
+        name = children[0]
+        return self._create(
+            IdentifierAST,
+            name,
+            name=str(name),
+        )
+
+    def declaration(self, children):
+        type, name = children
+        return self._create(
+            DeclareAST,
+            type,
+            name,
+            type=type.value,
+            target=name,
+        )
 
     def assignment_suffix(self, children):
         return children[1]

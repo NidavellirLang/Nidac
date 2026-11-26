@@ -212,8 +212,11 @@ assignment: type_spec? var_target assignment_suffix
 ?assignment_suffix: ASSIGN _assignment_chain
     | AUG_ASSIGN expr
 
-_assignment_chain: chain_target (ASSIGN chain_target)* ASSIGN expr
-    | expr
+// _assignment_chain: chain_target (ASSIGN chain_target)* ASSIGN expr
+
+//     | expr
+
+_assignment_chain: expr
 
 // Zincirdeki sonraki hedefler tipsizdir (a = b = 1). Tipli olamamaları
 

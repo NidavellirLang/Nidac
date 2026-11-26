@@ -32,18 +32,23 @@ class Parser:
     def error(self, error):
         raise error
 
+    def get_parser_arguments(self):
+        return {
+            "propagate_positions": True,
+            "postlex": NidaIndenter(),
+            "transformer": ASTTranslator(
+                visit_tokens=True, id_alloc=self.id_alloc, source=self.source_code
+            ),
+        }
+
     def parse_dynamic(self):
         self.parser = LarkLoader.Lark.open(
             str(self.grammar_path),
             parser="lalr",
             lexer="basic",
             start="start",
-            propagate_positions=True,
-            postlex=NidaIndenter(),
             maybe_placeholders=False,
-            transformer=ASTTranslator(
-                visit_tokens=True, id_alloc=self.id_alloc, source=self.source_code
-            ),
+            **self.get_parser_arguments()
         )
         try:
             self.ast_tree = self.parser.parse(self.source_code)
@@ -53,16 +58,11 @@ class Parser:
         return self.ast_tree
 
     def parse_standalone(self):
-        self.parser = LarkLoader.Lark_StandAlone()
-
-        translator = ASTTranslator(
-            visit_tokens=True,
-            id_alloc=self.id_alloc,
-            source=self.source_code,
-        )
+        self.parser = LarkLoader.Lark_StandAlone(**self.get_parser_arguments())
 
         try:
-            # self.ast_tree = translator.transform(self.parser.parse(self.source_code))
+            self.ast_tree = self.parser.parse(self.source_code)
+
             pass
         except Exception as e:
             self.error(e)

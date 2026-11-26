@@ -5,7 +5,8 @@ from utils import SysArgs
 class _LarkLoader:
 
     def __init__(self):
-        self.requested_mode = SysArgs.parser_mode
+        self.requested_mode = SysArgs.parser_mode or "native"
+        self.is_select = SysArgs.parser_mode is not None
 
         self._modules = []
         self.is_standalone = False
@@ -22,7 +23,9 @@ class _LarkLoader:
 
             return [lark, lark.indenter]
         except ImportError:
-            print("Fallback: lark parser not found")
+            if self.is_select:
+                print("Fallback: lark parser not found")
+
             return None
 
     def load_standalone(self):
@@ -31,7 +34,9 @@ class _LarkLoader:
 
             return [standalone_parser]
         except ImportError:
-            print("Fallback: standalone parser not found")
+            if self.is_select:
+                print("Fallback: standalone parser not found")
+
             return None
 
     def load_parser(self, retry=0):
@@ -62,7 +67,7 @@ class _LarkLoader:
         self._modules.extend(modules)
         self.is_standalone = is_standalone
 
-        if SysArgs.verbose_logs:
+        if self.is_select:
             print("Selected parser:  ", "Native" if is_standalone else "Dynamic")
             print(
                 "Requested parser: ",

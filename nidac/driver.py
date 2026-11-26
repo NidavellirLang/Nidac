@@ -110,7 +110,8 @@ class Nidac:
         self.asts = parser.run()
         if SysArgs.dump_ast:
             print("===== AST =====")
-            print("\n".join(map(str, self.asts)))
+            # print(self.asts)
+            print("\n\n".join(map(str, self.asts)))
 
         return self.asts
 
