@@ -7,11 +7,7 @@ from utils.tree_utils import TreeReprMixin, _paint, _CYAN, _MAGENTA
 
 from typing import Any
 
-
-@dataclass(frozen=True, slots=True)
-class Child:
-    name: str
-    optional: bool = False
+from utils.traversal import Child  # noqa: F401  (part of the AST node DSL)
 
 
 @dataclass(slots=True, repr=False, kw_only=True)

@@ -45,6 +45,12 @@ class TrackedList(list):
         super().__setitem__(key, value)
 
 
+@dataclass(frozen=True, slots=True)
+class Child:
+    name: str
+    optional: bool = False
+
+
 @dataclass(slots=True, repr=False, kw_only=True)
 class Symbol:
     type: Type | None = None
@@ -283,10 +289,11 @@ class Symbol:
 
 @dataclass(slots=True, repr=False, kw_only=True)
 class AssignSymbol(Symbol):
-    target: Symbol
+    __children__ = ("target", Child("value", optional=True))
+
+    target: IdentifierSymbol | FieldAccessSymbol
     value: Symbol | None
 
-    field: FieldAccessSymbol | None = None
     parent_assign: AssignSymbol | None = None
 
 
@@ -312,7 +319,9 @@ class NoneSymbol(Symbol):
 
 @dataclass(slots=True, repr=False, kw_only=True)
 class FunctionSymbol(Symbol):
-    name: str
+    __children__ = ("name", "args", "body")
+
+    name: IdentifierSymbol
     args: list[Symbol] = dc_field(default_factory=list)
     body: list[Symbol] = dc_field(default_factory=list)
     returned: list[Symbol] = dc_field(default_factory=list)
@@ -323,42 +332,53 @@ class FunctionSymbol(Symbol):
 
 @dataclass(slots=True, repr=False, kw_only=True)
 class ReturnSymbol(Symbol):
+    __children__ = (Child("value", optional=True),)
+
     value: Symbol | None
 
 
 @dataclass(slots=True, repr=False, kw_only=True)
 class CallSymbol(Symbol):
-    name: str
-    class_ref_type: Type | None = None
-    args: list[Symbol] = dc_field(default_factory=list)
-    field: FieldAccessSymbol | None = None
+    __children__ = ("target", "arguments")
+
+    target: IdentifierSymbol | FieldAccessSymbol
+
+    arguments: list[Symbol] = dc_field(default_factory=list)
     lookup: Symbol | None = None
 
 
 @dataclass(slots=True, repr=False, kw_only=True)
 class IntrinsicCallSymbol(Symbol):
-    name: str
+    __children__ = ("target", "arguments")
+
+    name: IdentifierSymbol
     args: list[Symbol] = dc_field(default_factory=list)
     intrinsic: IntrinsicAST | None = None
 
 
 @dataclass(slots=True, repr=False, kw_only=True)
 class VariableSymbol(Symbol):
-    name: str
+    __children__ = ("name", "lookup")
+
+    name: IdentifierSymbol
     lookup: Symbol
 
 
 @dataclass(slots=True, repr=False, kw_only=True)
 class BinaryOpSymbol(Symbol):
+    __children__ = ("left", "right")
+
     op: Symbol
-    left_sym: Symbol
-    right_sym: Symbol
+    left: Symbol
+    right: Symbol
 
 
 @dataclass(slots=True, repr=False, kw_only=True)
 class UnaryOpSymbol(Symbol):
+    __children__ = ("right",)
+
     op: Symbol
-    right_sym: Symbol
+    right: Symbol
 
 
 @dataclass(slots=True, repr=False, kw_only=True)
@@ -382,29 +402,29 @@ class UnavailableSymbol(Symbol):
 
 @dataclass(slots=True, repr=False, kw_only=True)
 class IfSymbol(Symbol):
+    __children__ = ("cond", "body", "elifs", Child("elses", optional=True), "merges")
+
     cond: Symbol
     body: list[Symbol]
     elifs: list[ElifSymbol] = dc_field(default_factory=list)
-    else_body: list[Symbol] | None = None
+    elses: list[Symbol] | None = None
     merges: list[MergeAssignmentSymbol] = dc_field(default_factory=list)
 
 
 @dataclass(slots=True, repr=False, kw_only=True)
 class ElifSymbol(Symbol):
+    __children__ = ("cond", "body")
+
     cond: Symbol
     body: list[Symbol] = dc_field(default_factory=list)
 
 
 @dataclass(slots=True, repr=False, kw_only=True)
 class WhileSymbol(Symbol):
+    __children__ = ("cond", "body")
+
     cond: Symbol
     body: list[Symbol] = dc_field(default_factory=list)
-
-    # TODO: impl
-    # def __init__(self, cond, body, ast_node):
-    #     self.cond = cond
-    #     self.body = body
-    #     self.ast_node = ast_node
 
 
 @dataclass(slots=True, repr=False, kw_only=True)
@@ -414,7 +434,9 @@ class BooleanSymbol(Symbol):
 
 @dataclass(slots=True, repr=False, kw_only=True)
 class ClassSymbol(Symbol):
-    name: str
+    __children__ = ("name", "init_fn", "params", "body")
+
+    name: IdentifierSymbol
     init_fn: FunctionSymbol | None = None
     params: list[Symbol] = dc_field(default_factory=list)
     body: list[Symbol] = dc_field(default_factory=list)
@@ -424,45 +446,16 @@ class ClassSymbol(Symbol):
 
 @dataclass(slots=True, repr=False, kw_only=True)
 class FieldAccessSymbol(Symbol):
+    __children__ = ("target", Child("field", optional=True))
+
     target: Symbol
     field: FieldAccessSymbol | None = None
 
 
 @dataclass(slots=True, repr=False, kw_only=True)
-class SelfSymbol(Symbol):
-    class_name: str | None = None
-    name: str = "self"
-
-
-@dataclass(slots=True, repr=False, kw_only=True)
-class ConstructorCallSymbol(Symbol):
-    pass
-    # TODO: impl
-    # def __init__(self, name, args, lookup, ast_node):
-    #     self.name = name
-    #     self.args = args
-    #     self.lookup = lookup
-    #     self.ast_node = ast_node
-
-    #     self.arg_offset = 1
-
-    #     self.type = None
-
-
-@dataclass(slots=True, repr=False, kw_only=True)
-class ListLiteralSymbol(Symbol):
-    pass
-    # TODO: impl
-    # def __init__(self, elements, ast_node):
-    #     self.elements = elements
-    #     self.appended_elements = []
-    #     self.ast_node = ast_node
-
-    #     self.type = None
-
-
-@dataclass(slots=True, repr=False, kw_only=True)
 class MergeAssignmentSymbol(Symbol):
+    __children__ = ("merge_sym",)
+
     merge_sym: AssignSymbol
     debug_name: str
 
@@ -481,6 +474,10 @@ class BreakSymbol(Symbol):
 
 @dataclass(slots=True, repr=False, kw_only=True)
 class ContinueSymbol(Symbol):
+    pass
+
+
+class PassSymbol(Symbol):
     pass
 
 

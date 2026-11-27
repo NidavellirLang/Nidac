@@ -24,6 +24,10 @@ class BaseBuilder:
 
         return node_id
 
+    def get_lk(self, ast):
+        node_id = self.get_id(ast)
+        return self.symbol_table.get_symbol(node_id)
+
     def create(self, symbol, ast, register=True, **kw):
         result = symbol(ast_node=ast, **kw)
 

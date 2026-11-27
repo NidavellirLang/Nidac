@@ -178,6 +178,9 @@ class SymbolTableManager:
         self.global_scope.define_symbol_id(symbol_id, symbol)
         return symbol
 
+    def define_func_name(self, name, symbol):
+        self.global_scope.define_func(name, symbol)
+
     def define_class(self, name, symbol_id, symbol):
         self.current_scope.define_class(name, symbol)
         self.global_scope.define_symbol_id(symbol_id, symbol)

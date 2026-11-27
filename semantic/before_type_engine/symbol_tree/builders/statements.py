@@ -22,14 +22,20 @@ class StatementBuilder(BaseBuilder):
 
     @v_args(childs=True)
     def visit_FunctionAST(self, ast, childs=None):
-        return self.create(FunctionSymbol, ast, **childs)
+        name = ast.name.name
+        symbol = self.create(FunctionSymbol, ast, **childs)
+        self.symbol_table.define_func_name(name, symbol)
+        return symbol
 
     def visit_PassAST(self, ast):
-        pass
+        return self.create(PassSymbol, ast)
 
     @v_args(childs=True)
     def visit_DeclareAST(self, node, childs=None):
-        return self.create(AssignSymbol, node, value=None, **childs)
+        name = node.target.name
+        symbol = self.create(AssignSymbol, node, value=None, **childs)
+        self.symbol_table.define_assignment_name(name, symbol)
+        return symbol
 
     @v_args(childs=True)
     def visit_AssignAST(self, node, childs=None):
