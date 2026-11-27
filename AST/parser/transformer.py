@@ -62,11 +62,7 @@ class ASTTranslator(LarkLoader.Transformer):
         return children[0]
 
     def NUMBER(self, token):
-        return NumberAST(
-            int(token),
-            node_id=self.alloc_id(),
-            line=self._token_line(token),
-        )
+        return self._create(NumberAST, token, value=int(token))
 
     def STRING(self, token):
         return self._create(StringAST, token, value=str(token))

@@ -16,6 +16,7 @@ class Child:
 
 @dataclass(slots=True, repr=False, kw_only=True)
 class AST(TreeReprMixin):
+    __scope__ = False
     __children__ = ()
 
     line: Line = None
@@ -70,6 +71,7 @@ class ImportAST(StmtAST):
 
 @dataclass(slots=True, repr=False, kw_only=True)
 class ClassAST(StmtAST):
+    __scope__ = True
     __children__ = ("name", "body")
 
     name: IdentifierAST
@@ -112,6 +114,7 @@ class DeclareAST(StmtAST):
 
 @dataclass(slots=True, repr=False, kw_only=True)
 class WhileAST(StmtAST):
+    __scope__ = True
     __children__ = ("cond", "body")
 
     cond: ExprAST
@@ -120,6 +123,7 @@ class WhileAST(StmtAST):
 
 @dataclass(slots=True, repr=False, kw_only=True)
 class ForAST(StmtAST):
+    __scope__ = True
     __children__ = ("target", "source", "body")
 
     target: DeclareAST
@@ -134,6 +138,7 @@ class PassAST(StmtAST):
 
 @dataclass(slots=True, repr=False, kw_only=True)
 class FunctionAST(StmtAST):
+    __scope__ = True
     __children__ = ("name", "args", "body")
 
     name: IdentifierAST
@@ -152,6 +157,7 @@ class BlockAST(StmtAST):
 
 @dataclass(slots=True, repr=False, kw_only=True)
 class ElifAST(StmtAST):
+    __scope__ = True
     __children__ = ("cond", "body")
 
     cond: ExprAST
@@ -160,6 +166,7 @@ class ElifAST(StmtAST):
 
 @dataclass(slots=True, repr=False, kw_only=True)
 class ElseAST(StmtAST):
+    __scope__ = True
     __children__ = ("body",)
 
     body: list
@@ -167,6 +174,7 @@ class ElseAST(StmtAST):
 
 @dataclass(slots=True, repr=False, kw_only=True)
 class IfAST(StmtAST):
+    __scope__ = True
     __children__ = (
         "cond",
         "body",

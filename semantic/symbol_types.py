@@ -281,36 +281,36 @@ class Symbol:
             return ast_node.node_id
 
 
-@dataclass(slots=True, repr=False)
+@dataclass(slots=True, repr=False, kw_only=True)
 class AssignSymbol(Symbol):
-    name: str
+    target: Symbol
     value: Symbol | None
 
     field: FieldAccessSymbol | None = None
     parent_assign: AssignSymbol | None = None
 
 
-@dataclass(slots=True, repr=False)
+@dataclass(slots=True, repr=False, kw_only=True)
 class DefinitionSymbol(AssignSymbol):
     pass
 
 
-@dataclass(slots=True, repr=False)
+@dataclass(slots=True, repr=False, kw_only=True)
 class NumberSymbol(Symbol):
     value: int | float
 
 
-@dataclass(slots=True, repr=False)
+@dataclass(slots=True, repr=False, kw_only=True)
 class StringSymbol(Symbol):
     value: str
 
 
-@dataclass(slots=True, repr=False)
+@dataclass(slots=True, repr=False, kw_only=True)
 class NoneSymbol(Symbol):
     pass
 
 
-@dataclass(slots=True, repr=False)
+@dataclass(slots=True, repr=False, kw_only=True)
 class FunctionSymbol(Symbol):
     name: str
     args: list[Symbol] = dc_field(default_factory=list)
@@ -321,12 +321,12 @@ class FunctionSymbol(Symbol):
     scope: Scope = None
 
 
-@dataclass(slots=True, repr=False)
+@dataclass(slots=True, repr=False, kw_only=True)
 class ReturnSymbol(Symbol):
     value: Symbol | None
 
 
-@dataclass(slots=True, repr=False)
+@dataclass(slots=True, repr=False, kw_only=True)
 class CallSymbol(Symbol):
     name: str
     class_ref_type: Type | None = None
@@ -335,33 +335,33 @@ class CallSymbol(Symbol):
     lookup: Symbol | None = None
 
 
-@dataclass(slots=True, repr=False)
+@dataclass(slots=True, repr=False, kw_only=True)
 class IntrinsicCallSymbol(Symbol):
     name: str
     args: list[Symbol] = dc_field(default_factory=list)
     intrinsic: IntrinsicAST | None = None
 
 
-@dataclass(slots=True, repr=False)
+@dataclass(slots=True, repr=False, kw_only=True)
 class VariableSymbol(Symbol):
     name: str
     lookup: Symbol
 
 
-@dataclass(slots=True, repr=False)
+@dataclass(slots=True, repr=False, kw_only=True)
 class BinaryOpSymbol(Symbol):
     op: Symbol
     left_sym: Symbol
     right_sym: Symbol
 
 
-@dataclass(slots=True, repr=False)
+@dataclass(slots=True, repr=False, kw_only=True)
 class UnaryOpSymbol(Symbol):
     op: Symbol
     right_sym: Symbol
 
 
-@dataclass(slots=True, repr=False)
+@dataclass(slots=True, repr=False, kw_only=True)
 class ForSymbol(Symbol):
     pass
     # TODO: impl
@@ -375,12 +375,12 @@ class ForSymbol(Symbol):
     #     self.type = None
 
 
-@dataclass(slots=True, repr=False)
+@dataclass(slots=True, repr=False, kw_only=True)
 class UnavailableSymbol(Symbol):
     why: str
 
 
-@dataclass(slots=True, repr=False)
+@dataclass(slots=True, repr=False, kw_only=True)
 class IfSymbol(Symbol):
     cond: Symbol
     body: list[Symbol]
@@ -389,13 +389,13 @@ class IfSymbol(Symbol):
     merges: list[MergeAssignmentSymbol] = dc_field(default_factory=list)
 
 
-@dataclass(slots=True, repr=False)
+@dataclass(slots=True, repr=False, kw_only=True)
 class ElifSymbol(Symbol):
     cond: Symbol
     body: list[Symbol] = dc_field(default_factory=list)
 
 
-@dataclass(slots=True, repr=False)
+@dataclass(slots=True, repr=False, kw_only=True)
 class WhileSymbol(Symbol):
     cond: Symbol
     body: list[Symbol] = dc_field(default_factory=list)
@@ -407,12 +407,12 @@ class WhileSymbol(Symbol):
     #     self.ast_node = ast_node
 
 
-@dataclass(slots=True, repr=False)
+@dataclass(slots=True, repr=False, kw_only=True)
 class BooleanSymbol(Symbol):
     value: bool
 
 
-@dataclass(slots=True, repr=False)
+@dataclass(slots=True, repr=False, kw_only=True)
 class ClassSymbol(Symbol):
     name: str
     init_fn: FunctionSymbol | None = None
@@ -422,19 +422,19 @@ class ClassSymbol(Symbol):
     methods: dict[str, Symbol] = dc_field(default_factory=dict)
 
 
-@dataclass(slots=True, repr=False)
+@dataclass(slots=True, repr=False, kw_only=True)
 class FieldAccessSymbol(Symbol):
     target: Symbol
     field: FieldAccessSymbol | None = None
 
 
-@dataclass(slots=True, repr=False)
+@dataclass(slots=True, repr=False, kw_only=True)
 class SelfSymbol(Symbol):
     class_name: str | None = None
     name: str = "self"
 
 
-@dataclass(slots=True, repr=False)
+@dataclass(slots=True, repr=False, kw_only=True)
 class ConstructorCallSymbol(Symbol):
     pass
     # TODO: impl
@@ -449,7 +449,7 @@ class ConstructorCallSymbol(Symbol):
     #     self.type = None
 
 
-@dataclass(slots=True, repr=False)
+@dataclass(slots=True, repr=False, kw_only=True)
 class ListLiteralSymbol(Symbol):
     pass
     # TODO: impl
@@ -461,30 +461,30 @@ class ListLiteralSymbol(Symbol):
     #     self.type = None
 
 
-@dataclass(slots=True, repr=False)
+@dataclass(slots=True, repr=False, kw_only=True)
 class MergeAssignmentSymbol(Symbol):
     merge_sym: AssignSymbol
     debug_name: str
 
 
-@dataclass(slots=True, repr=False)
+@dataclass(slots=True, repr=False, kw_only=True)
 class IdentifierSymbol(Symbol):
     name: str
     lookup: Symbol | None = None
     resolve_name: str | None = None
 
 
-@dataclass(slots=True, repr=False)
+@dataclass(slots=True, repr=False, kw_only=True)
 class BreakSymbol(Symbol):
     pass
 
 
-@dataclass(slots=True, repr=False)
+@dataclass(slots=True, repr=False, kw_only=True)
 class ContinueSymbol(Symbol):
     pass
 
 
-@dataclass(slots=True, repr=False)
+@dataclass(slots=True, repr=False, kw_only=True)
 class IndexAccessSymbol(Symbol):
     target: VariableSymbol
     index: Symbol
